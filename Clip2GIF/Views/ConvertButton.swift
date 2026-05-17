@@ -11,6 +11,14 @@ private struct AnimatedGIFView: NSViewRepresentable {
         v.imageScaling = .scaleProportionallyUpOrDown
         v.animates = true
         v.image = NSImage(contentsOf: url)
+        // NSImageView 는 이미지 픽셀 크기를 intrinsic content size 로 보고해
+        // 가로가 긴 GIF 에서 SwiftUI 의 .aspectRatio 를 무시하고 프레임을
+        // 넘쳐 좌우가 잘린다. 우선순위를 낮춰 SwiftUI 가 크기를 완전히
+        // 통제하도록 한다.
+        v.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        v.setContentHuggingPriority(.defaultLow, for: .vertical)
+        v.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        v.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
         return v
     }
 
@@ -233,6 +241,18 @@ struct ResultPreviewSheet: View {
         return OutputEstimator.formatted(bytes: n.int64Value)
     }
 
+    /// 비율 ar 을 box 안에 잘림 없이 꽉 맞추는 크기(레터박스).
+    private func fittedSize(ar: CGFloat, in box: CGSize) -> CGSize {
+        guard ar > 0, box.width > 0, box.height > 0 else { return box }
+        var w = box.width
+        var h = w / ar
+        if h > box.height {
+            h = box.height
+            w = h * ar
+        }
+        return CGSize(width: max(1, w), height: max(1, h))
+    }
+
     /// GIF "만" 복사한다. NSImage 를 넣으면 받는 앱이 정지 jpg/tiff 로
     /// 붙여넣으므로, 파일 URL + GIF 원본 데이터만 클립보드에 올린다.
     private func copyGIF() {
@@ -259,15 +279,19 @@ struct ResultPreviewSheet: View {
                 Text("변환 완료").font(.headline)
             }
 
-            AnimatedGIFView(url: url)
-                .aspectRatio(ar, contentMode: .fit)
-                .frame(maxWidth: 760, maxHeight: 560)
-                .background(Color.black.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .strokeBorder(Color.secondary.opacity(0.2))
-                )
+            GeometryReader { geo in
+                let fit = fittedSize(ar: ar, in: geo.size)
+                AnimatedGIFView(url: url)
+                    .frame(width: fit.width, height: fit.height)
+                    .background(Color.black.opacity(0.06))
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .strokeBorder(Color.secondary.opacity(0.2))
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .frame(maxWidth: 760, maxHeight: 560)
 
             VStack(spacing: 2) {
                 Text(url.lastPathComponent)
