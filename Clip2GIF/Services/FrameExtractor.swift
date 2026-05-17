@@ -47,8 +47,12 @@ struct FrameExtractor {
                 for i in 0..<totalFrames {
                     // 프레임마다 autoreleasepool로 즉시 해제
                     let result: Result<URL, Error> = autoreleasepool {
-                        // 출력 i번째 프레임 = 원본 시간 start + (i/fps)*speed
-                        let seconds = start + (Double(i) / Double(settings.fps)) * speed
+                        // 출력 i번째 프레임 = 원본 시간 start + (i/fps)*speed.
+                        // 부동소수 오차로 마지막 프레임이 end 를 미세하게 넘으면
+                        // AVAssetImageGenerator 가 throw 해 전체 변환이 실패하므로
+                        // [start, end-epsilon] 으로 클램프한다.
+                        let raw = start + (Double(i) / Double(settings.fps)) * speed
+                        let seconds = min(raw, max(start, end - 1.0 / 600.0))
                         let time = CMTimeMakeWithSeconds(seconds, preferredTimescale: 600)
 
                         do {

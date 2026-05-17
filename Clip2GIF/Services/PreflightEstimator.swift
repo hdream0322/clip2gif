@@ -105,14 +105,21 @@ enum PreflightEstimator {
                 generator.requestedTimeToleranceBefore = CMTimeMake(value: 1, timescale: 600)
                 generator.requestedTimeToleranceAfter = CMTimeMake(value: 1, timescale: 600)
 
+                let trimStart = settings.trimStart
+                let trimEnd = settings.effectiveTrimEnd(duration: source.duration)
+
                 var urls: [URL] = []
                 urls.reserveCapacity(count)
 
                 for i in 0..<count {
                     let result: Swift.Result<URL, Error> = autoreleasepool {
                         let outputIndex = startFrameIndex + i
-                        let seconds = settings.trimStart
+                        // FrameExtractor 와 동일하게 [start, end-epsilon] 클램프.
+                        // (startFrameIndex+i 가 totalFrames 를 넘어 영상 밖 시간을
+                        //  요청하면 copyCGImage 가 throw → 추정 전체 실패)
+                        let raw = trimStart
                             + (Double(outputIndex) / Double(settings.fps)) * speed
+                        let seconds = min(raw, max(trimStart, trimEnd - 1.0 / 600.0))
                         let time = CMTimeMakeWithSeconds(seconds, preferredTimescale: 600)
                         do {
                             let cg = try generator.copyCGImage(at: time, actualTime: nil)
