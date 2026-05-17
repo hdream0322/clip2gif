@@ -33,4 +33,5 @@ VideoToGif/Resources/bin/gifski
 # OMC / Claude Code internal state (keep .omc/plans/ only)
 .omc/state/
 .omc/sessions/
+.omc/project-memory.json
 .claude/
