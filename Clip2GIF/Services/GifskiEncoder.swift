@@ -12,6 +12,32 @@ struct GifskiEncoder {
     /// posix_spawn 의 E2BIG / 인자 잘림을 사전에 차단한다.
     private static let maxArgBytes = 700_000
 
+    /// gifski Process 를 onCancel 에서 안전하게 종료하기 위한 스레드 안전 박스.
+    /// 시작 직후 취소되는 레이스도 막기 위해 cancelled 플래그를 별도 보관한다.
+    private final class ProcessBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var process: Process?
+        private(set) var cancelled = false
+
+        func attach(_ p: Process) {
+            lock.lock(); process = p; lock.unlock()
+        }
+
+        /// 취소 표시 + (실행 중이면) 종료. cancelled 였는지 반환.
+        @discardableResult
+        func cancel() -> Bool {
+            lock.lock(); defer { lock.unlock() }
+            cancelled = true
+            if let p = process, p.isRunning { p.terminate() }
+            return true
+        }
+
+        var isCancelled: Bool {
+            lock.lock(); defer { lock.unlock() }
+            return cancelled
+        }
+    }
+
     static func locate() throws -> URL {
         guard let url = Bundle.main.url(forResource: "gifski", withExtension: nil) else {
             throw ConversionError.binaryMissing
@@ -90,11 +116,14 @@ struct GifskiEncoder {
         }
         args += frameArgs
 
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+        let procBox = ProcessBox()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             let process = Process()
             process.executableURL = gifskiURL
             process.arguments = args
             if let frameDir { process.currentDirectoryURL = frameDir }
+            procBox.attach(process)
 
             let stderrPipe = Pipe()
             process.standardError = stderrPipe
@@ -154,7 +183,9 @@ struct GifskiEncoder {
                 let code = proc.terminationStatus
                 syncQueue.async {
                     stderrData.append(remaining)
-                    if code == 0 {
+                    if procBox.isCancelled {
+                        continuation.resume(throwing: ConversionError.cancelled)
+                    } else if code == 0 {
                         DispatchQueue.main.async { progress(1.0) }
                         continuation.resume()
                     } else {
@@ -168,11 +199,17 @@ struct GifskiEncoder {
 
             do {
                 try process.run()
+                // 시작 직후 취소된 경우(onCancel 이 attach 이전/run 이전에 끝남)
+                // 종료를 보장해 좀비 프로세스를 막는다.
+                if procBox.isCancelled { process.terminate() }
             } catch {
                 ticker.cancel()
                 stderrPipe.fileHandleForReading.readabilityHandler = nil
                 continuation.resume(throwing: ConversionError.ioFailed(error.localizedDescription))
             }
+            }
+        } onCancel: {
+            procBox.cancel()
         }
     }
 }

@@ -32,9 +32,16 @@ struct FrameExtractor {
             ? nil
             : settings.pixelCropRect(for: source.naturalSize)
 
-        // 백그라운드 큐에서 직렬로 동기 추출 (메모리 폭주 방지)
-        return try await withCheckedThrowingContinuation { continuation in
+        // 백그라운드 큐에서 직렬로 동기 추출 (메모리 폭주 방지).
+        // Task 취소 시 토큰으로 루프를 중단해 .cancelled 로 빠져나간다.
+        let token = CancellationToken()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[URL], Error>) in
             DispatchQueue.global(qos: .userInitiated).async {
+                if token.isCancelled {
+                    continuation.resume(throwing: ConversionError.cancelled)
+                    return
+                }
                 let asset = AVURLAsset(url: source.url)
                 let generator = AVAssetImageGenerator(asset: asset)
                 generator.appliesPreferredTrackTransform = true
@@ -45,6 +52,10 @@ struct FrameExtractor {
                 urls.reserveCapacity(totalFrames)
 
                 for i in 0..<totalFrames {
+                    if token.isCancelled {
+                        continuation.resume(throwing: ConversionError.cancelled)
+                        return
+                    }
                     // 프레임마다 autoreleasepool로 즉시 해제
                     let result: Result<URL, Error> = autoreleasepool {
                         // 출력 i번째 프레임 = 원본 시간 start + (i/fps)*speed.
@@ -83,6 +94,9 @@ struct FrameExtractor {
 
                 continuation.resume(returning: urls)
             }
+            }
+        } onCancel: {
+            token.cancel()
         }
     }
 

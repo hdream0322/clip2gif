@@ -97,8 +97,16 @@ enum PreflightEstimator {
         pixelCrop: CGRect?,
         tempDir: URL
     ) async throws -> [URL] {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[URL], Error>) in
+        // 설정을 빠르게 바꾸면 preflightTask 가 취소되는데, 취소가 추출 루프와
+        // gifski 프로세스까지 전파돼야 좀비 프로세스가 누적되지 않는다.
+        let token = CancellationToken()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[URL], Error>) in
             DispatchQueue.global(qos: .userInitiated).async {
+                if token.isCancelled {
+                    continuation.resume(throwing: ConversionError.cancelled)
+                    return
+                }
                 let asset = AVURLAsset(url: source.url)
                 let generator = AVAssetImageGenerator(asset: asset)
                 generator.appliesPreferredTrackTransform = true
@@ -112,6 +120,10 @@ enum PreflightEstimator {
                 urls.reserveCapacity(count)
 
                 for i in 0..<count {
+                    if token.isCancelled {
+                        continuation.resume(throwing: ConversionError.cancelled)
+                        return
+                    }
                     let result: Swift.Result<URL, Error> = autoreleasepool {
                         let outputIndex = startFrameIndex + i
                         // FrameExtractor 와 동일하게 [start, end-epsilon] 클램프.
@@ -141,6 +153,9 @@ enum PreflightEstimator {
                 }
                 continuation.resume(returning: urls)
             }
+            }
+        } onCancel: {
+            token.cancel()
         }
     }
 }

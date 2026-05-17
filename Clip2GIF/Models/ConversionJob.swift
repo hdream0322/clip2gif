@@ -1,5 +1,22 @@
 import Foundation
 
+/// Swift `Task` 취소를 동기 컨텍스트(백그라운드 큐의 프레임 추출 루프)로
+/// 전달하기 위한 스레드 안전 토큰. `withTaskCancellationHandler` 의 onCancel
+/// 에서 `cancel()` 하고, 루프가 매 반복마다 `isCancelled` 를 검사한다.
+final class CancellationToken: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _cancelled = false
+
+    var isCancelled: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return _cancelled
+    }
+
+    func cancel() {
+        lock.lock(); _cancelled = true; lock.unlock()
+    }
+}
+
 enum ConversionState: Equatable {
     case idle
     case extracting(progress: Double)

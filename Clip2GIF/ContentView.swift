@@ -14,6 +14,8 @@ struct ContentView: View {
     @State private var preflightLoading: Bool = false
     @State private var preflightTask: Task<Void, Never>?
     @State private var lastPreflightKey: String = ""
+    /// 진행 중인 변환 Task. 취소 시 cancel() 로 추출 루프·gifski 를 중단.
+    @State private var conversionTask: Task<Void, Never>?
 
     /// 출력 파일 크기에 영향을 주는 설정만 모은 키. 이 값이 바뀔 때만 재추정.
     /// loopForever(무한반복)는 GIF 반복 플래그라 크기 불변 → 의도적으로 제외.
@@ -245,9 +247,16 @@ struct ContentView: View {
 
             Divider()
 
-            ConvertButton(job: job) {
-                await convert()
-            }
+            ConvertButton(
+                job: job,
+                start: {
+                    conversionTask?.cancel()
+                    conversionTask = Task { await convert() }
+                },
+                cancel: {
+                    conversionTask?.cancel()
+                }
+            )
             .padding(16)
         }
     }
@@ -585,9 +594,19 @@ struct ContentView: View {
             }
         } catch let e as ConversionError {
             await MainActor.run {
-                job.state = .failed(e)
+                if e == .cancelled {
+                    // 사용자가 의도적으로 취소 → 경고창 없이 조용히 초기화.
+                    job.reset()
+                } else {
+                    job.state = .failed(e)
+                    alertError = e
+                }
                 DockProgress.set(nil)
-                alertError = e
+            }
+        } catch is CancellationError {
+            await MainActor.run {
+                job.reset()
+                DockProgress.set(nil)
             }
         } catch {
             let e = ConversionError.ioFailed(error.localizedDescription)

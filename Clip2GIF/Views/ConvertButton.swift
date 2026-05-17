@@ -2,7 +2,8 @@ import SwiftUI
 
 struct ConvertButton: View {
     @ObservedObject var job: ConversionJob
-    let action: () async -> Void
+    let start: () -> Void
+    let cancel: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -17,16 +18,27 @@ struct ConvertButton: View {
                     .lineLimit(3)
             }
 
-            Button {
-                Task { await action() }
-            } label: {
-                Label(buttonLabel, systemImage: buttonIcon)
-                    .frame(maxWidth: .infinity)
+            if job.isRunning {
+                Button(role: .cancel) {
+                    cancel()
+                } label: {
+                    Label("취소", systemImage: "xmark.circle")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .keyboardShortcut(".", modifiers: .command)
+            } else {
+                Button {
+                    start()
+                } label: {
+                    Label(buttonLabel, systemImage: buttonIcon)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .keyboardShortcut(.return, modifiers: [])
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(job.isRunning)
-            .keyboardShortcut(.return, modifiers: [])
         }
     }
 
