@@ -516,8 +516,8 @@ struct ContentView: View {
         guard let source else { return }
 
         let baseDir = customOutputDir ?? source.url.deletingLastPathComponent()
-        let name = source.url.deletingPathExtension().lastPathComponent + "_converted.gif"
-        let outputURL = baseDir.appendingPathComponent(name)
+        let stem = source.url.deletingPathExtension().lastPathComponent + "_converted"
+        let outputURL = Self.uniqueOutputURL(in: baseDir, stem: stem, ext: "gif")
 
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
@@ -619,6 +619,20 @@ struct ContentView: View {
     }
 
     // MARK: - 헬퍼
+
+    /// 같은 이름이 이미 있으면 `_2`, `_3` … 을 붙여 덮어쓰기를 방지한다.
+    /// (같은 영상을 다른 설정으로 재변환할 때 이전 결과가 사라지지 않도록)
+    private static func uniqueOutputURL(in dir: URL, stem: String, ext: String) -> URL {
+        let fm = FileManager.default
+        let first = dir.appendingPathComponent("\(stem).\(ext)")
+        if !fm.fileExists(atPath: first.path) { return first }
+        var n = 2
+        while true {
+            let candidate = dir.appendingPathComponent("\(stem)_\(n).\(ext)")
+            if !fm.fileExists(atPath: candidate.path) { return candidate }
+            n += 1
+        }
+    }
 
     private func formatDuration(_ t: TimeInterval) -> String {
         let m = Int(t) / 60
