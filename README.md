@@ -1,4 +1,12 @@
-# Clip2GIF
+<p align="center">
+  <img src="icon.png" alt="Clip2GIF" width="160" height="160" />
+</p>
+
+<h1 align="center">Clip2GIF</h1>
+
+<p align="center">macOS용 동영상 → GIF 변환 앱</p>
+
+---
 
 macOS용 동영상 → GIF 변환 앱입니다. 비디오를 드래그하거나 Finder에서 바로 불러와 구간·영역·품질을 조정하고 GIF로 내보냅니다. 네이티브 SwiftUI 앱이며, 프레임 추출은 AVFoundation, 인코딩은 번들된 [gifski](https://gif.ski) 바이너리를 사용합니다.
 

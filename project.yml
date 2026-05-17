@@ -44,9 +44,11 @@ targets:
         CODE_SIGN_STYLE: Automatic
         CODE_SIGNING_REQUIRED: NO
         CODE_SIGNING_ALLOWED: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
       path: Clip2GIF/Info.plist
       properties:
+        CFBundleIconName: AppIcon
         NSHighResolutionCapable: true
         CFBundleDevelopmentRegion: en
         CFBundleLocalizations:
