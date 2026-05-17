@@ -59,6 +59,12 @@ final class PreviewController: ObservableObject {
         isPlaying = false
     }
 
+    /// 현재 재생 위치(초). "현재 위치를 시작/끝으로" 버튼이 사용.
+    var currentSeconds: TimeInterval {
+        let t = CMTimeGetSeconds(player.currentTime())
+        return t.isFinite ? max(0, t) : 0
+    }
+
     func seek(to seconds: TimeInterval) {
         let time = CMTimeMakeWithSeconds(seconds, preferredTimescale: 600)
         player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)

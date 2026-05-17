@@ -235,7 +235,8 @@ struct ContentView: View {
                     duration: source.duration,
                     onScrub: { t in
                         preview.seek(to: t)
-                    }
+                    },
+                    playheadSeconds: { preview.currentSeconds }
                 )
                 .padding(.horizontal, 4)
                 .disabled(job.isRunning)
