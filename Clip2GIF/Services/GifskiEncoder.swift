@@ -117,8 +117,11 @@ struct GifskiEncoder {
         let frameDir = frames.first?.deletingLastPathComponent()
         let frameArgs = frames.map { $0.lastPathComponent }
 
-        let approxArgBytes = args.reduce(0) { $0 + $1.utf8.count + 1 }
-            + frameArgs.reduce(0) { $0 + $1.utf8.count + 1 }
+        // reduce(into:) + 명시적 누적자로 분리 — 한 줄 중첩 reduce 는
+        // Release(최신 Xcode) 타입체커가 시간초과한다.
+        var approxArgBytes = 0
+        for a in args { approxArgBytes += a.utf8.count + 1 }
+        for f in frameArgs { approxArgBytes += f.utf8.count + 1 }
         guard approxArgBytes < maxArgBytes else {
             throw ConversionError.tooManyFrames(frames.count)
         }
