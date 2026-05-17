@@ -11,11 +11,19 @@ permissions:
 jobs:
   build-and-release:
     # Apple Silicon runner — matches the committed arm64 gifski binary.
-    runs-on: macos-14
+    # macos-15 ships a modern Xcode that can read XcodeGen's current pbxproj
+    # format (objectVersion 77); macos-14's default Xcode 15.4 cannot.
+    runs-on: macos-15
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Select latest Xcode
+        run: |
+          LATEST="$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)"
+          sudo xcode-select -s "${LATEST:-/Applications/Xcode.app}/Contents/Developer"
+          xcodebuild -version
 
       - name: Install build tooling
         run: brew install xcodegen create-dmg
