@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @State private var source: VideoSource?
@@ -100,6 +101,9 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .vtgOpenVideoFile)) { note in
             if let url = note.object as? URL { loadVideo(url: url) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .vtgRequestOpenFile)) { _ in
+            openVideoPanel()
         }
         .onAppear {
             if let url = PendingOpenStore.shared.consume() { loadVideo(url: url) }
@@ -509,6 +513,23 @@ struct ContentView: View {
                 self.customOutputDir = nil
                 self.preview.pause()
             }
+        }
+    }
+
+    /// ⌘O / "열기…" 메뉴 → 파일 선택 패널. 영상 유무와 무관하게 동작.
+    private func openVideoPanel() {
+        let panel = NSOpenPanel()
+        panel.title = "비디오 파일 선택"
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        var allowed: [UTType] = [.movie, .video, .quickTimeMovie, .mpeg4Movie]
+        for ext in SupportedVideo.extensions {
+            if let t = UTType(filenameExtension: ext) { allowed.append(t) }
+        }
+        panel.allowedContentTypes = allowed
+        if panel.runModal() == .OK, let url = panel.url {
+            loadVideo(url: url)
         }
     }
 

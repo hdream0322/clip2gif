@@ -1,6 +1,20 @@
 import Foundation
 import AppKit
 
+/// 지원 비디오 형식의 단일 소스 of truth.
+/// (드롭/Finder 서비스/Open With/파일 패널 세 곳에 하드코딩 복제돼 있던 것을 통합)
+enum SupportedVideo {
+    static let extensions: [String] = ["mp4", "mov", "m4v", "avi", "webm"]
+    static let extensionSet: Set<String> = Set(extensions)
+
+    static func isSupported(_ url: URL) -> Bool {
+        extensionSet.contains(url.pathExtension.lowercased())
+    }
+
+    /// 사용자 안내용 표기. 예: "MP4, MOV, M4V, AVI, WebM"
+    static let displayList = "MP4, MOV, M4V, AVI, WebM"
+}
+
 struct VideoSource: Identifiable, Equatable {
     var id: URL { url }
     let url: URL

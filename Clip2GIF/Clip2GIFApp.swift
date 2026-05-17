@@ -16,6 +16,12 @@ struct Clip2GIFApp: App {
             CommandGroup(after: .appInfo) {
                 CheckForUpdatesView(updater: updater.updater)
             }
+            CommandGroup(replacing: .newItem) {
+                Button("열기…") {
+                    NotificationCenter.default.post(name: .vtgRequestOpenFile, object: nil)
+                }
+                .keyboardShortcut("o", modifiers: .command)
+            }
         }
     }
 }

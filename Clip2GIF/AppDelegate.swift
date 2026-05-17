@@ -2,6 +2,8 @@ import AppKit
 
 extension Notification.Name {
     static let vtgOpenVideoFile = Notification.Name("VTGOpenVideoFile")
+    /// ⌘O 등으로 "파일 열기" 패널 요청 (ContentView 가 수신해 NSOpenPanel 표시).
+    static let vtgRequestOpenFile = Notification.Name("VTGRequestOpenFile")
 }
 
 /// Service / "Open With" 진입점에서 받은 비디오 URL을 보관·재생.
