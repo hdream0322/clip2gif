@@ -24,6 +24,8 @@ struct ConvertButton: View {
     @ObservedObject var job: ConversionJob
     let start: () -> Void
     let cancel: () -> Void
+    /// 결과 GIF 를 별도 모달 창으로 다시 띄울 때 호출.
+    var onShowResult: (URL) -> Void = { _ in }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -118,16 +120,6 @@ struct ConvertButton: View {
                 .font(.subheadline.bold())
                 .foregroundStyle(.green)
 
-            AnimatedGIFView(url: url)
-                .frame(maxWidth: .infinity)
-                .frame(height: 140)
-                .background(Color.black.opacity(0.04))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(Color.secondary.opacity(0.2))
-                )
-
             if let size = fileSize(url: url) {
                 Text("크기 \(OutputEstimator.formatted(bytes: size))")
                     .font(.callout.monospacedDigit())
@@ -138,6 +130,15 @@ struct ConvertButton: View {
                 .foregroundStyle(.tertiary)
                 .lineLimit(1)
                 .truncationMode(.middle)
+
+            Button {
+                onShowResult(url)
+            } label: {
+                Label("미리보기 창 열기", systemImage: "rectangle.on.rectangle")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
 
             HStack(spacing: 8) {
                 Button {
@@ -207,5 +208,79 @@ struct ConvertButton: View {
     private func fileSize(url: URL) -> Int64? {
         let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
         return (attrs?[.size] as? NSNumber)?.int64Value
+    }
+}
+
+/// 변환 완료 시 결과 GIF 를 별도 모달 창(sheet)으로 크게 보여준다.
+struct ResultPreviewSheet: View {
+    let url: URL
+    var onClose: () -> Void
+
+    private var pixelSize: CGSize {
+        guard let img = NSImage(contentsOf: url) else {
+            return CGSize(width: 480, height: 360)
+        }
+        if let rep = img.representations.first, rep.pixelsWide > 0 {
+            return CGSize(width: rep.pixelsWide, height: rep.pixelsHigh)
+        }
+        return img.size
+    }
+
+    private var fileSizeText: String? {
+        let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+        guard let n = attrs?[.size] as? NSNumber else { return nil }
+        return OutputEstimator.formatted(bytes: n.int64Value)
+    }
+
+    var body: some View {
+        let ar = pixelSize.height > 0
+            ? pixelSize.width / pixelSize.height
+            : 4.0 / 3.0
+        VStack(spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                Text("변환 완료").font(.headline)
+            }
+
+            AnimatedGIFView(url: url)
+                .aspectRatio(ar, contentMode: .fit)
+                .frame(maxWidth: 760, maxHeight: 560)
+                .background(Color.black.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(Color.secondary.opacity(0.2))
+                )
+
+            VStack(spacing: 2) {
+                Text(url.lastPathComponent)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1).truncationMode(.middle)
+                if let fileSizeText {
+                    Text(fileSizeText)
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            HStack(spacing: 10) {
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([url])
+                } label: {
+                    Label("Finder에서 보기", systemImage: "folder")
+                }
+                Button {
+                    NSWorkspace.shared.open(url)
+                } label: {
+                    Label("열기", systemImage: "play.rectangle")
+                }
+                Spacer()
+                Button("닫기", action: onClose)
+                    .keyboardShortcut(.cancelAction)
+            }
+        }
+        .padding(20)
+        .frame(minWidth: 460, minHeight: 420)
     }
 }

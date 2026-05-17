@@ -2,6 +2,12 @@ import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 
+/// 결과 미리보기 sheet 식별자 (.sheet(item:) 용).
+private struct ResultItem: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
 struct ContentView: View {
     @State private var source: VideoSource?
     @State private var settings: ConversionSettings = .default
@@ -19,6 +25,8 @@ struct ContentView: View {
     @State private var lastPreflightKey: String = ""
     /// 진행 중인 변환 Task. 취소 시 cancel() 로 추출 루프·gifski 를 중단.
     @State private var conversionTask: Task<Void, Never>?
+    /// 변환 완료 결과 미리보기(별도 모달 창). nil 이면 닫힘.
+    @State private var resultPreview: ResultItem?
 
     // 자주 쓰는 출력 설정을 영속화 — 영상마다 .default 로 초기화되던 마찰 제거.
     // (trim/crop/fps 는 영상 의존이라 영속 대상에서 제외)
@@ -78,6 +86,9 @@ struct ContentView: View {
             Button("휴지통으로 이동", role: .destructive) { deleteSourceToTrash() }
         } message: {
             Text("원본 영상 파일이 휴지통으로 이동됩니다. 변환에 사용할 영상이라면 주의하세요.")
+        }
+        .sheet(item: $resultPreview) { item in
+            ResultPreviewSheet(url: item.url) { resultPreview = nil }
         }
         .onChange(of: settings) { _ in
             // 사용자 선호 영속화 (다음 영상 로드 시 복원). 영상이 있을 때만 —
@@ -289,6 +300,9 @@ struct ContentView: View {
                 },
                 cancel: {
                     conversionTask?.cancel()
+                },
+                onShowResult: { url in
+                    resultPreview = ResultItem(url: url)
                 }
             )
             .padding(16)
@@ -808,6 +822,8 @@ struct ContentView: View {
                 job.detail = ""
                 job.state = .done(outputURL)
                 DockProgress.set(nil)
+                // 결과 GIF 를 별도 모달 창으로 자동 표시.
+                resultPreview = ResultItem(url: outputURL)
                 // Finder 자동 노출은 제거 — 결과를 앱 내에서 바로 미리보고,
                 // 필요 시 완료 블록의 "Finder에서 보기" 버튼으로 연다.
                 // 긴 변환 후 다른 작업 중이면 완료를 놓치므로 알린다.
