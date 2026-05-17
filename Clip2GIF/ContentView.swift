@@ -10,6 +10,8 @@ struct ContentView: View {
     /// 사용자가 직접 고른 출력 폴더(있으면 우선). 없으면 매번 원본 영상 폴더에 저장.
     @State private var customOutputDir: URL?
     @State private var alertError: ConversionError?
+    /// 미지원 파일 드롭/선택 시 안내 (조용히 무시하지 않도록).
+    @State private var dropError: String?
     @State private var showTrashConfirm = false
     @State private var preflightBytes: Int64?
     @State private var preflightLoading: Bool = false
@@ -60,6 +62,14 @@ struct ContentView: View {
             Button("확인") { alertError = nil }
         } message: {
             Text(alertError?.errorDescription ?? "알 수 없는 오류가 발생했습니다.")
+        }
+        .alert("지원하지 않는 파일", isPresented: Binding(
+            get: { dropError != nil },
+            set: { if !$0 { dropError = nil } }
+        )) {
+            Button("확인") { dropError = nil }
+        } message: {
+            Text(dropError ?? "")
         }
         .alert("원본 영상 파일을 휴지통으로 이동할까요?", isPresented: $showTrashConfirm) {
             Button("취소", role: .cancel) { }
@@ -114,9 +124,12 @@ struct ContentView: View {
                 provider.loadItem(forTypeIdentifier: "public.file-url") { item, _ in
                     guard let data = item as? Data,
                           let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
-                    let validExts = ["mp4", "mov", "m4v", "avi", "webm"]
-                    if validExts.contains(url.pathExtension.lowercased()) {
-                        DispatchQueue.main.async { loadVideo(url: url) }
+                    DispatchQueue.main.async {
+                        if SupportedVideo.isSupported(url) {
+                            loadVideo(url: url)
+                        } else {
+                            dropError = "‘\(url.lastPathComponent)’ 은(는) 지원하지 않는 형식입니다.\n지원: \(SupportedVideo.displayList)"
+                        }
                     }
                 }
                 return true
@@ -234,9 +247,12 @@ struct ContentView: View {
                 )
                 .padding(.horizontal, 4)
             } else {
-                DropZoneView { url in
-                    loadVideo(url: url)
-                }
+                DropZoneView(
+                    onDrop: { url in loadVideo(url: url) },
+                    onReject: { url in
+                        dropError = "‘\(url.lastPathComponent)’ 은(는) 지원하지 않는 형식입니다.\n지원: \(SupportedVideo.displayList)"
+                    }
+                )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }

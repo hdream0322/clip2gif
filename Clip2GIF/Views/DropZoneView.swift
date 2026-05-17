@@ -4,9 +4,9 @@ import AppKit
 
 struct DropZoneView: View {
     let onDrop: (URL) -> Void
+    /// 미지원 파일이 들어왔을 때 안내용. (조용히 무시하지 않음)
+    var onReject: (URL) -> Void = { _ in }
     @State private var isTargeted = false
-
-    private let validExtensions = ["mp4", "mov", "m4v", "avi", "webm"]
 
     var body: some View {
         ZStack {
@@ -30,7 +30,7 @@ struct DropZoneView: View {
                 Text("또는 클릭해서 파일 선택")
                     .font(.body)
                     .foregroundStyle(.secondary)
-                Text("MP4, MOV, M4V, AVI, WebM")
+                Text(SupportedVideo.displayList)
                     .font(.callout)
                     .foregroundStyle(.tertiary)
             }
@@ -51,7 +51,7 @@ struct DropZoneView: View {
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
         var allowed: [UTType] = [.movie, .video, .quickTimeMovie, .mpeg4Movie]
-        for ext in validExtensions {
+        for ext in SupportedVideo.extensions {
             if let t = UTType(filenameExtension: ext) {
                 allowed.append(t)
             }
@@ -59,8 +59,10 @@ struct DropZoneView: View {
         panel.allowedContentTypes = allowed
 
         if panel.runModal() == .OK, let url = panel.url {
-            if validExtensions.contains(url.pathExtension.lowercased()) {
+            if SupportedVideo.isSupported(url) {
                 onDrop(url)
+            } else {
+                onReject(url)
             }
         }
     }
@@ -72,8 +74,8 @@ struct DropZoneView: View {
             provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) { item, _ in
                 guard let data = item as? Data,
                       let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
-                if validExtensions.contains(url.pathExtension.lowercased()) {
-                    DispatchQueue.main.async { onDrop(url) }
+                DispatchQueue.main.async {
+                    SupportedVideo.isSupported(url) ? onDrop(url) : onReject(url)
                 }
             }
             return true
@@ -82,8 +84,8 @@ struct DropZoneView: View {
         if provider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
             provider.loadItem(forTypeIdentifier: UTType.movie.identifier) { item, _ in
                 guard let url = item as? URL else { return }
-                if validExtensions.contains(url.pathExtension.lowercased()) {
-                    DispatchQueue.main.async { onDrop(url) }
+                DispatchQueue.main.async {
+                    SupportedVideo.isSupported(url) ? onDrop(url) : onReject(url)
                 }
             }
             return true
