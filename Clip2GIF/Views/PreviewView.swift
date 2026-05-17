@@ -46,14 +46,17 @@ final class PreviewController: ObservableObject {
         player.isMuted = true
         player.actionAtItemEnd = .pause
         // 재생 위치를 주기적으로 발행(트림 막대 playhead 표시용).
-        let interval = CMTime(seconds: 0.05, preferredTimescale: 600)
+        // 0.2초(5Hz) + 변화 임계로 줄여, 재생 중 TrimSlider 전체가 과도하게
+        // 재렌더되어 +/- 버튼 탭이 씹히던 문제를 방지.
+        let interval = CMTime(seconds: 0.2, preferredTimescale: 600)
         periodicObserver = player.addPeriodicTimeObserver(
             forInterval: interval, queue: .main
         ) { [weak self] t in
             let s = CMTimeGetSeconds(t)
             Task { @MainActor [weak self] in
                 guard let self, self.reverseTimer == nil, s.isFinite else { return }
-                self.currentTime = max(0, s)
+                let v = max(0, s)
+                if abs(v - self.currentTime) >= 0.05 { self.currentTime = v }
             }
         }
     }

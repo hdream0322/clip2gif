@@ -121,17 +121,27 @@ struct TrimSlider: View {
     ) -> some View {
         HStack(spacing: 2) {
             Text(title).font(.caption).foregroundStyle(.secondary)
-            Button(action: onMinus) { Image(systemName: "minus") }
-                .buttonStyle(.borderless)
-                .disabled(!canMinus)
-                .help("\(title) 0.1초 앞으로")
+            Button(action: onMinus) {
+                Image(systemName: "minus")
+                    .frame(width: 24, height: 22)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(!canMinus)
+            .help("\(title) 0.1초 앞으로")
             Text(formatTime(time))
                 .font(.callout.monospacedDigit())
                 .frame(minWidth: 56)
-            Button(action: onPlus) { Image(systemName: "plus") }
-                .buttonStyle(.borderless)
-                .disabled(!canPlus)
-                .help("\(title) 0.1초 뒤로")
+            Button(action: onPlus) {
+                Image(systemName: "plus")
+                    .frame(width: 24, height: 22)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(!canPlus)
+            .help("\(title) 0.1초 뒤로")
             if let onPlayhead {
                 Button(action: onPlayhead) {
                     Text("현재")
