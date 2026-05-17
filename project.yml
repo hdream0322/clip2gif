@@ -49,8 +49,8 @@ targets:
     settings:
       base:
         PRODUCT_NAME: Clip2GIF
-        MARKETING_VERSION: "0.1.0"
-        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "0.2.0"
+        CURRENT_PROJECT_VERSION: "2"
         MACOSX_DEPLOYMENT_TARGET: "13.0"
         ENABLE_HARDENED_RUNTIME: YES
         SWIFT_VERSION: "5.9"
