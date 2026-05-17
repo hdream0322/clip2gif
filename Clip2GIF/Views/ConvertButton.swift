@@ -269,29 +269,49 @@ struct ResultPreviewSheet: View {
         }
     }
 
+    private var fileExists: Bool {
+        FileManager.default.fileExists(atPath: url.path)
+    }
+
     var body: some View {
         let ar = pixelSize.height > 0
             ? pixelSize.width / pixelSize.height
             : 4.0 / 3.0
+        let exists = fileExists
         VStack(spacing: 12) {
             HStack(spacing: 6) {
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                Text("변환 완료").font(.headline)
+                Image(systemName: exists ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                    .foregroundStyle(exists ? Color.green : Color.orange)
+                Text(exists ? "변환 완료" : "파일 없음").font(.headline)
             }
 
-            GeometryReader { geo in
-                let fit = fittedSize(ar: ar, in: geo.size)
-                AnimatedGIFView(url: url)
-                    .frame(width: fit.width, height: fit.height)
-                    .background(Color.black.opacity(0.06))
-                    .cornerRadius(10)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .strokeBorder(Color.secondary.opacity(0.2))
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if exists {
+                GeometryReader { geo in
+                    let fit = fittedSize(ar: ar, in: geo.size)
+                    AnimatedGIFView(url: url)
+                        .frame(width: fit.width, height: fit.height)
+                        .background(Color.black.opacity(0.06))
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .strokeBorder(Color.secondary.opacity(0.2))
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .frame(maxWidth: 760, maxHeight: 560)
+            } else {
+                VStack(spacing: 8) {
+                    Image(systemName: "questionmark.folder")
+                        .font(.system(size: 44))
+                        .foregroundStyle(.tertiary)
+                    Text("GIF 파일을 찾을 수 없습니다.\n이동·삭제되었거나 이름이 변경되었습니다.")
+                        .font(.callout)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: 560)
+                .frame(minHeight: 200)
             }
-            .frame(maxWidth: 760, maxHeight: 560)
 
             VStack(spacing: 2) {
                 Text(url.lastPathComponent)
@@ -311,11 +331,13 @@ struct ResultPreviewSheet: View {
                 } label: {
                     Label("Finder에서 보기", systemImage: "folder")
                 }
+                .disabled(!exists)
                 Button {
                     NSWorkspace.shared.open(url)
                 } label: {
                     Label("열기", systemImage: "play.rectangle")
                 }
+                .disabled(!exists)
                 Button {
                     copyGIF()
                 } label: {
@@ -326,6 +348,7 @@ struct ResultPreviewSheet: View {
                     .foregroundStyle(copied ? Color.green : Color.primary)
                 }
                 .help("GIF 파일을 클립보드에 복사")
+                .disabled(!exists)
                 Spacer()
                 Button("닫기", action: onClose)
                     .keyboardShortcut(.cancelAction)

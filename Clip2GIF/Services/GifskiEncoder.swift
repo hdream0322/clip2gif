@@ -124,6 +124,17 @@ struct GifskiEncoder {
         }
         args += frameArgs
 
+        // 인코딩 진행률 추정 시간(프레임 수 × 출력 해상도 기반 휴리스틱).
+        // gifski 가 비-TTY 에서 진행 로그를 안 줄 때, 몇 초만에 0.9 로 튄 뒤
+        // 멈추는 대신 이 추정시간에 선형 비례해 더 정직하게 차오르게 한다.
+        let outSize = settings.pixelOutputSize(for: naturalSize)
+        let megapixels = Double(outSize.width * outSize.height) / 1_000_000.0
+        let estimatedEncodeSeconds = max(
+            1.0,
+            0.4 + Double(frames.count) * (0.010 + megapixels * 0.025)
+        )
+        let encodeStart = Date()
+
         let procBox = ProcessBox()
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
@@ -143,7 +154,6 @@ struct GifskiEncoder {
             let syncQueue = DispatchQueue(label: "com.heodream.clip2gif.gifski")
             var stderrData = Data()
             var sawRealProgress = false
-            var synthetic = 0.0
             let framePattern = try? NSRegularExpression(pattern: #"Frame (\d+) / (\d+)"#)
 
             // gifski는 파이프(비-TTY) 환경에서 진행 로그를 안 내보내는 경우가 많아
@@ -154,8 +164,8 @@ struct GifskiEncoder {
             ticker.schedule(deadline: .now() + 0.15, repeating: 0.15)
             ticker.setEventHandler {
                 guard !sawRealProgress else { return }
-                synthetic += (0.9 - synthetic) * 0.05
-                let value = min(0.9, synthetic)
+                let elapsed = Date().timeIntervalSince(encodeStart)
+                let value = min(0.92, elapsed / estimatedEncodeSeconds)
                 DispatchQueue.main.async { progress(value) }
             }
             ticker.resume()
