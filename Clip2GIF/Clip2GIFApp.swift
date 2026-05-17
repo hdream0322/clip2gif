@@ -1,9 +1,10 @@
 import SwiftUI
+import Sparkle
 
 @main
 struct Clip2GIFApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    private let updater = UpdaterManager.shared.controller
+    private let updater: SPUStandardUpdaterController = UpdaterManager.shared.controller
 
     var body: some Scene {
         WindowGroup {
