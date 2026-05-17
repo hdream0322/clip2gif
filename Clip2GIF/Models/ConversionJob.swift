@@ -14,6 +14,8 @@ enum ConversionError: LocalizedError, Equatable {
     case unsupportedCodec
     case cancelled
     case binaryMissing
+    case binaryTampered
+    case tooManyFrames(Int)
 
     var errorDescription: String? {
         switch self {
@@ -27,6 +29,10 @@ enum ConversionError: LocalizedError, Equatable {
             return "변환이 취소되었습니다."
         case .binaryMissing:
             return "gifski 실행 파일을 찾을 수 없습니다."
+        case .binaryTampered:
+            return "gifski 실행 파일이 손상되었거나 변조되었습니다. 앱을 다시 설치하세요."
+        case .tooManyFrames(let n):
+            return "프레임이 너무 많습니다(\(n)개). 트림 구간을 줄이거나 FPS·속도를 조정하세요."
         }
     }
 }
