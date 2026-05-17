@@ -123,24 +123,24 @@ struct TrimSlider: View {
             Text(title).font(.caption).foregroundStyle(.secondary)
             Button(action: onMinus) {
                 Image(systemName: "minus")
-                    .frame(width: 24, height: 22)
+                    .frame(width: 16, height: 16)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+            .buttonStyle(.borderless)
             .disabled(!canMinus)
+            .opacity(canMinus ? 1 : 0.3)
             .help("\(title) 0.1초 앞으로")
             Text(formatTime(time))
                 .font(.callout.monospacedDigit())
                 .frame(minWidth: 56)
             Button(action: onPlus) {
                 Image(systemName: "plus")
-                    .frame(width: 24, height: 22)
+                    .frame(width: 16, height: 16)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+            .buttonStyle(.borderless)
             .disabled(!canPlus)
+            .opacity(canPlus ? 1 : 0.3)
             .help("\(title) 0.1초 뒤로")
             if let onPlayhead {
                 Button(action: onPlayhead) {

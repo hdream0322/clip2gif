@@ -245,7 +245,11 @@ struct ContentView: View {
                     ),
                     duration: source.duration,
                     onScrub: { t in
-                        preview.seek(to: t)
+                        // 재생 중에는 핸들 위치로 시킹하지 않는다. 시킹하면
+                        // 그 위치(범위 밖)에서 재생되다 멈추는 경합이 생김.
+                        // 범위가 바뀌면 setRange 가 시작점부터 재생 처리.
+                        // (일시정지 상태에선 프레임 미리보기로 시킹 유지)
+                        if !preview.isPlaying { preview.seek(to: t) }
                     },
                     playheadSeconds: { preview.currentSeconds },
                     playhead: preview.currentTime
