@@ -5,6 +5,11 @@ options:
   deploymentTarget:
     macOS: "13.0"
 
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.9.2"
+
 targets:
   Clip2GIF:
     type: application
@@ -14,6 +19,8 @@ targets:
         excludes:
           - "Resources/**"
           - "**/AGENTS.md"
+    dependencies:
+      - package: Sparkle
     postBuildScripts:
       - name: "Copy gifski binary"
         script: |
@@ -57,6 +64,12 @@ targets:
         CFBundleIconName: AppIcon
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        # Sparkle auto-update. Feed points at the appcast.xml asset attached to
+        # the latest GitHub Release (uploaded by .github/workflows/release.yml).
+        SUFeedURL: https://github.com/hdream0322/clip2gif/releases/latest/download/appcast.xml
+        SUPublicEDKey: xcMIw3PIiYFC39sJx/iisdfXJET/cWTkJnvd50QBAdw=
+        SUEnableAutomaticChecks: true
+        SUScheduledCheckInterval: 86400
         NSHighResolutionCapable: true
         CFBundleDevelopmentRegion: en
         CFBundleLocalizations:

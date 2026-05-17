@@ -35,13 +35,33 @@ if [ ! -f "$GIFSKI" ]; then
   echo "       (the 'Copy gifski binary' postBuildScript must run before this)" >&2
   exit 1
 fi
+
+sign() { codesign --force --sign - "$@"; }
+
+# Sparkle.framework ships its own nested code (XPC services + helper apps).
+# Re-signing the outer app breaks the framework's seal unless every nested
+# Mach-O is re-signed first, inside-out. Without this the updater's XPC
+# services fail to launch and "Check for Updates" silently does nothing.
+SPARKLE_FW="$APP_PATH/Contents/Frameworks/Sparkle.framework"
+if [ -d "$SPARKLE_FW" ]; then
+  echo "==> Signing Sparkle.framework nested code"
+  SPK_V="$SPARKLE_FW/Versions/B"
+  for xpc in "$SPK_V/XPCServices/"*.xpc; do
+    [ -e "$xpc" ] && sign "$xpc"
+  done
+  [ -e "$SPK_V/Autoupdate" ]   && sign "$SPK_V/Autoupdate"
+  [ -e "$SPK_V/Updater.app" ]  && sign "$SPK_V/Updater.app"
+  sign "$SPARKLE_FW"
+fi
+
 chmod +x "$GIFSKI"
-codesign --force --sign - "$GIFSKI"
-codesign --force --sign - "$APP_PATH"
+sign "$GIFSKI"
+sign "$APP_PATH"
 
 echo "==> Verifying signature"
 codesign --verify --strict --verbose=2 "$APP_PATH"
 codesign --verify --verbose=2 "$GIFSKI"
+[ -d "$SPARKLE_FW" ] && codesign --verify --verbose=2 "$SPARKLE_FW"
 
 echo "==> Building DMG: $DMG_PATH"
 STAGING="$(mktemp -d)"

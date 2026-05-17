@@ -56,6 +56,14 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/hdream0322/clip2gif/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>xcMIw3PIiYFC39sJx/iisdfXJET/cWTkJnvd50QBAdw=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
 	<key>NSServices</key>
 	<array>
 		<dict>
