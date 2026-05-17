@@ -52,6 +52,28 @@ open Clip2GIF.xcodeproj
 
 입력: `mp4` · `mov` · `m4v` · `avi` · `webm`
 
+## 문제 해결
+
+### Finder 우클릭 → 서비스에 "GIF으로 변환하기"가 안 보일 때
+
+macOS Services 메뉴는 기본적으로 꺼져 있는 항목이 있어, 앱을 설치해도 메뉴에 나타나지 않을 수 있습니다. 다음을 확인하세요.
+
+1. **시스템 설정 → 키보드 → 키보드 단축키… → 서비스** 를 엽니다.
+2. 목록을 아래로 내려 **파일 및 폴더**(또는 **일반**) 항목에서 **GIF으로 변환하기** 체크박스를 켭니다.
+3. Finder를 재시작하면(또는 로그아웃 후 다시 로그인) 우클릭 → 서비스 메뉴에 나타납니다.
+
+체크박스 자체가 목록에 없다면 Launch Services가 앱을 아직 인식하지 못한 경우입니다. 앱을 한 번 실행했다가 종료한 뒤 아래로 캐시를 갱신하세요.
+
+```bash
+# Launch Services 등록 강제 갱신
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
+  -f /Applications/Clip2GIF.app
+
+# Finder / 서비스 데몬 재시작
+killall Finder
+killall pbs
+```
+
 ## 아키텍처
 
 단일 타겟·단일 모듈 SwiftUI 앱. **Models**(값 타입·상태) → **Services**(변환 로직) → **Views**(SwiftUI) 3계층 + `AppDelegate`(서비스/"열기" 진입점) 구조입니다. 변환 파이프라인은 `FrameExtractor`(PNG 직렬 추출) → `GifskiEncoder`(gifski 프로세스 실행) 순으로 흐르며, 진행률은 `ConversionJob`이 UI와 Dock에 중계합니다. 상세 구조는 루트 [`AGENTS.md`](AGENTS.md)부터 시작하는 계층형 문서를 참조하세요.
