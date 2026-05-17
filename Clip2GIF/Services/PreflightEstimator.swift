@@ -69,7 +69,11 @@ enum PreflightEstimator {
     ) async throws -> Int64 {
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("preflight-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+            at: tempDir,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
         defer { try? FileManager.default.removeItem(at: tempDir) }
 
         let pixelCrop: CGRect? = settings.isFullFrame

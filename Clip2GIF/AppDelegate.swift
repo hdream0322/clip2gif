@@ -28,6 +28,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.servicesProvider = self
         NSUpdateDynamicServices()
+        Self.purgeStaleTempDirs()
+    }
+
+    /// 변환/프리플라이트 중 강제 종료(크래시·SIGKILL) 시 남는 임시 디렉터리를
+    /// 시작할 때 청소. 프리픽스가 있는 우리 디렉터리만 안전하게 제거한다.
+    private static func purgeStaleTempDirs() {
+        let fm = FileManager.default
+        let tmp = fm.temporaryDirectory
+        guard let entries = try? fm.contentsOfDirectory(
+            at: tmp, includingPropertiesForKeys: nil
+        ) else { return }
+        for url in entries {
+            let name = url.lastPathComponent
+            if name.hasPrefix("clip2gif-") || name.hasPrefix("preflight-") {
+                try? fm.removeItem(at: url)
+            }
+        }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
