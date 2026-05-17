@@ -14,7 +14,9 @@ struct TrimSlider: View {
     var body: some View {
         VStack(spacing: 6) {
             GeometryReader { geo in
-                let trackWidth = geo.size.width - handleSize
+                // 레이아웃 초기/극소 폭에서 trackWidth 가 0 이하가 되면
+                // ratio 계산이 NaN/Inf → 핸들이 사라진다. 최소 1로 가드.
+                let trackWidth = max(1, geo.size.width - handleSize)
                 let safeDuration = max(duration, 0.0001)
                 let startX = CGFloat(startTime / safeDuration) * trackWidth + handleSize / 2
                 let endX = CGFloat(endTime / safeDuration) * trackWidth + handleSize / 2
