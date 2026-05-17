@@ -33,6 +33,8 @@ enum ConversionError: LocalizedError, Equatable {
     case binaryMissing
     case binaryTampered
     case tooManyFrames(Int)
+    case sourceMissing
+    case insufficientDisk(neededMB: Int)
 
     /// 사용자 표시용 — 시스템 경로·gifski stderr 같은 내부 정보를 노출하지
     /// 않도록 일반화한다. 상세는 debugDetail 로 콘솔에만 남긴다.
@@ -52,6 +54,10 @@ enum ConversionError: LocalizedError, Equatable {
             return "gifski 실행 파일이 손상되었거나 변조되었습니다. 앱을 다시 설치하세요."
         case .tooManyFrames(let n):
             return "프레임이 너무 많습니다(\(n)개). 트림 구간을 줄이거나 FPS·속도를 조정하세요."
+        case .sourceMissing:
+            return "원본 영상을 찾을 수 없습니다. 변환 도중 파일이 이동·삭제·이름변경되었을 수 있습니다."
+        case .insufficientDisk(let mb):
+            return "저장 공간이 부족합니다. 임시 프레임에 약 \(mb)MB가 필요합니다. 공간을 확보한 뒤 다시 시도하세요."
         }
     }
 

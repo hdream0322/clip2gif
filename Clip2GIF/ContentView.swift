@@ -598,6 +598,13 @@ struct ContentView: View {
                 s.fps = max(6, Int(loaded.frameRate.rounded()))
                 // crop/trim 은 기본값(전체 프레임·전체 길이) 유지.
 
+                let bTotal = max(1, Int(
+                    (loaded.duration / max(0.1, s.speed)) * Double(s.fps)
+                ))
+                if let e = Self.storagePreflight(
+                    naturalSize: loaded.naturalSize, settings: s, totalFrames: bTotal
+                ) { throw e }
+
                 try FileManager.default.createDirectory(
                     at: tempDir,
                     withIntermediateDirectories: true,
@@ -707,6 +714,22 @@ struct ContentView: View {
     private func convert() async {
         guard let source else { return }
 
+        let trimDuration = settings.effectiveTrimEnd(duration: source.duration) - settings.trimStart
+        let outputDuration = trimDuration / max(0.1, settings.speed)
+        let totalFrames = max(1, Int(outputDuration * Double(settings.fps)))
+
+        // 사전 점검: 원본이 사라졌는지 / 임시 공간이 충분한지 (변환 시작 전).
+        if !FileManager.default.isReadableFile(atPath: source.url.path) {
+            await MainActor.run { job.state = .failed(.sourceMissing); report(.sourceMissing) }
+            return
+        }
+        if let e = Self.storagePreflight(
+            naturalSize: source.naturalSize, settings: settings, totalFrames: totalFrames
+        ) {
+            await MainActor.run { job.state = .failed(e); report(e) }
+            return
+        }
+
         let baseDir = customOutputDir ?? source.url.deletingLastPathComponent()
         let stem = source.url.deletingPathExtension().lastPathComponent + "_converted"
         let outputURL = Self.uniqueOutputURL(in: baseDir, stem: stem, ext: "gif")
@@ -731,10 +754,6 @@ struct ContentView: View {
         defer {
             try? FileManager.default.removeItem(at: tempDir)
         }
-
-        let trimDuration = settings.effectiveTrimEnd(duration: source.duration) - settings.trimStart
-        let outputDuration = trimDuration / max(0.1, settings.speed)
-        let totalFrames = max(1, Int(outputDuration * Double(settings.fps)))
 
         await MainActor.run {
             job.reset()
@@ -837,6 +856,32 @@ struct ContentView: View {
             if !fm.fileExists(atPath: candidate.path) { return candidate }
             n += 1
         }
+    }
+
+    /// 임시 프레임 PNG 의 대략적 디스크 풋프린트(추정). 프레임은 크롭
+    /// 픽셀 해상도로 저장되며 사진성 PNG 를 ~2 B/px 로 보수 추정.
+    private static func estimatedTempBytes(
+        naturalSize: CGSize, settings s: ConversionSettings, totalFrames: Int
+    ) -> Int64 {
+        let crop = s.pixelCropRect(for: naturalSize).size
+        let perFrame = Double(crop.width * crop.height) * 2.0
+        return Int64(perFrame * Double(max(1, totalFrames)))
+    }
+
+    /// 변환 전 저장공간 사전 점검. 부족하면 에러 반환(nil = 진행 가능).
+    private static func storagePreflight(
+        naturalSize: CGSize, settings s: ConversionSettings, totalFrames: Int
+    ) -> ConversionError? {
+        let need = estimatedTempBytes(
+            naturalSize: naturalSize, settings: s, totalFrames: totalFrames
+        )
+        let tmp = FileManager.default.temporaryDirectory
+        if let free = try? tmp.resourceValues(
+            forKeys: [.volumeAvailableCapacityForImportantUsageKey]
+        ).volumeAvailableCapacityForImportantUsage, free < need {
+            return .insufficientDisk(neededMB: Int(need / 1_048_576))
+        }
+        return nil
     }
 
     private func formatDuration(_ t: TimeInterval) -> String {
