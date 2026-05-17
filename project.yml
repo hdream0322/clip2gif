@@ -1,0 +1,87 @@
+name: VideoToGif
+
+options:
+  bundleIdPrefix: com.heodream
+  deploymentTarget:
+    macOS: "13.0"
+
+targets:
+  VideoToGif:
+    type: application
+    platform: macOS
+    sources:
+      - path: VideoToGif
+        excludes:
+          - "Resources/**"
+          - "**/AGENTS.md"
+    postBuildScripts:
+      - name: "Copy gifski binary"
+        script: |
+          set -e
+          DEST="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
+          mkdir -p "$DEST"
+          chmod u+w "$DEST/gifski" 2>/dev/null || true
+          cp -f "$SRCROOT/VideoToGif/Resources/bin/gifski" "$DEST/gifski"
+          chmod +x "$DEST/gifski"
+          echo "Copied gifski to $DEST/gifski"
+      - name: "Install to /Applications"
+        script: |
+          set -e
+          SRC="$TARGET_BUILD_DIR/$WRAPPER_NAME"
+          DEST="/Applications/$WRAPPER_NAME"
+          if [ -d "$SRC" ]; then
+            rm -rf "$DEST"
+            cp -R "$SRC" "$DEST"
+            /System/Library/CoreServices/pbs -update >/dev/null 2>&1 || true
+            echo "Installed $WRAPPER_NAME to /Applications"
+          fi
+    settings:
+      base:
+        PRODUCT_NAME: VideoToGif
+        MACOSX_DEPLOYMENT_TARGET: "13.0"
+        ENABLE_HARDENED_RUNTIME: NO
+        SWIFT_VERSION: "5.9"
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGNING_ALLOWED: NO
+    info:
+      path: VideoToGif/Info.plist
+      properties:
+        NSHighResolutionCapable: true
+        CFBundleDevelopmentRegion: en
+        CFBundleLocalizations:
+          - en
+          - ko
+          - ja
+          - zh-Hans
+          - fr
+          - de
+          - es
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Video
+            CFBundleTypeRole: Viewer
+            LSItemContentTypes:
+              - public.mpeg-4
+              - com.apple.quicktime-movie
+              - public.avi
+              - com.google.webm
+            CFBundleTypeExtensions:
+              - mp4
+              - mov
+              - m4v
+              - avi
+              - webm
+        NSServices:
+          - NSMenuItem:
+              default: GIF으로 변환하기
+            NSMessage: convertToGIF
+            NSPortName: VideoToGif
+            NSSendTypes:
+              - public.file-url
+              - NSFilenamesPboardType
+            NSSendFileTypes:
+              - public.movie
+              - public.mpeg-4
+              - com.apple.quicktime-movie
+              - public.avi
+              - org.webmproject.webm

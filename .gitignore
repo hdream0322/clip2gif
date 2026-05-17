@@ -1,0 +1,35 @@
+# Xcode
+*.xcodeproj
+xcuserdata/
+*.xccheckout
+*.xcscmblueprint
+*.moved-aside
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift
+.build/
+build/
+*.o
+*.d
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*
+
+# App artifacts
+*.gif
+
+# gifski binary (user supplies via bootstrap.sh)
+VideoToGif/Resources/bin/gifski
+
+# OMC / Claude Code internal state (keep .omc/plans/ only)
+.omc/state/
+.claude/
