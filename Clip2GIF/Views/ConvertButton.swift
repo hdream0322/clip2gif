@@ -1,4 +1,24 @@
 import SwiftUI
+import AppKit
+
+/// 변환 결과 GIF 를 실제로 애니메이션 재생하는 뷰 (SwiftUI 는 GIF 네이티브
+/// 애니메이션 미지원 → NSImageView.animates 사용).
+private struct AnimatedGIFView: NSViewRepresentable {
+    let url: URL
+
+    func makeNSView(context: Context) -> NSImageView {
+        let v = NSImageView()
+        v.imageScaling = .scaleProportionallyUpOrDown
+        v.animates = true
+        v.image = NSImage(contentsOf: url)
+        return v
+    }
+
+    func updateNSView(_ nsView: NSImageView, context: Context) {
+        nsView.image = NSImage(contentsOf: url)
+        nsView.animates = true
+    }
+}
 
 struct ConvertButton: View {
     @ObservedObject var job: ConversionJob
@@ -74,10 +94,21 @@ struct ConvertButton: View {
 
     @ViewBuilder
     private func doneBlock(url: URL) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             Label("완료", systemImage: "checkmark.circle.fill")
                 .font(.subheadline.bold())
                 .foregroundStyle(.green)
+
+            AnimatedGIFView(url: url)
+                .frame(maxWidth: .infinity)
+                .frame(height: 140)
+                .background(Color.black.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(Color.secondary.opacity(0.2))
+                )
+
             if let size = fileSize(url: url) {
                 Text("크기 \(OutputEstimator.formatted(bytes: size))")
                     .font(.callout.monospacedDigit())
@@ -88,6 +119,21 @@ struct ConvertButton: View {
                 .foregroundStyle(.tertiary)
                 .lineLimit(1)
                 .truncationMode(.middle)
+
+            HStack(spacing: 8) {
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([url])
+                } label: {
+                    Label("Finder에서 보기", systemImage: "folder")
+                }
+                Button {
+                    NSWorkspace.shared.open(url)
+                } label: {
+                    Label("열기", systemImage: "play.rectangle")
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
         }
     }
 

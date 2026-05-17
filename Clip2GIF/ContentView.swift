@@ -590,7 +590,8 @@ struct ContentView: View {
                 job.detail = ""
                 job.state = .done(outputURL)
                 DockProgress.set(nil)
-                NSWorkspace.shared.activateFileViewerSelecting([outputURL])
+                // Finder 자동 노출은 제거 — 결과를 앱 내에서 바로 미리보고,
+                // 필요 시 완료 블록의 "Finder에서 보기" 버튼으로 연다.
             }
         } catch let e as ConversionError {
             await MainActor.run {
