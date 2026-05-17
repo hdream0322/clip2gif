@@ -91,19 +91,28 @@ final class PreviewController: ObservableObject {
         currentTime = max(0, seconds)
     }
 
-    /// 트림 구간을 갱신. 재생 중이고 현재 위치가 범위 밖이면 시작점으로 시킹.
+    /// 트림 구간을 갱신. 시작/끝이 실제로 바뀌면(트림 이동) 재생 중일 때
+    /// 무조건 시작점부터 다시 재생한다. 끝을 현재 재생 위치보다 앞으로
+    /// 당겼을 때 onScrub 의 비동기 seek 와 경계검사가 엇갈려 범위 밖을
+    /// 재생하다 영상 끝에서 멈추던 버그를 근본 차단.
+    /// (화질·크롭 등 범위와 무관한 설정 변경 시엔 재생을 끊지 않음)
     func setRange(start: TimeInterval, end: TimeInterval) {
+        let newEnd = max(start + 0.05, end)
+        let rangeChanged = abs(start - rangeStart) > 1e-6
+            || abs(newEnd - rangeEnd) > 1e-6
         rangeStart = start
-        rangeEnd = max(start + 0.05, end)
+        rangeEnd = newEnd
         stopReverse()
         rebindLoopObserver()
         if isPlaying {
-            let cur = CMTimeGetSeconds(player.currentTime())
-            if cur < rangeStart || cur >= rangeEnd {
+            if rangeChanged {
                 seek(to: rangeStart)
+            } else {
+                let cur = CMTimeGetSeconds(player.currentTime())
+                if cur < rangeStart || cur >= rangeEnd {
+                    seek(to: rangeStart)
+                }
             }
-            // 끝을 현재 재생 위치보다 앞으로 당기면 앞에 경계가 없어
-            // AVPlayer 가 영상 끝(actionAtItemEnd=.pause)까지 가서 멈춰버린다.
             // 정방향 재생 중이면 rate 를 다시 걸어 정지 상태를 방지.
             if reverseTimer == nil {
                 player.rate = Float(currentSpeed)
