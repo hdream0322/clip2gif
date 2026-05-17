@@ -26,6 +26,9 @@ struct PreviewView: NSViewRepresentable {
 final class PreviewController: ObservableObject {
     let player = AVPlayer()
     @Published var isPlaying: Bool = false
+    /// 현재 재생 위치(초). 트림 막대의 재생 위치 표시에 사용.
+    @Published var currentTime: TimeInterval = 0
+    private var periodicObserver: Any?
 
     private var rangeStart: TimeInterval = 0
     private var rangeEnd: TimeInterval = 0
@@ -42,11 +45,25 @@ final class PreviewController: ObservableObject {
     init() {
         player.isMuted = true
         player.actionAtItemEnd = .pause
+        // 재생 위치를 주기적으로 발행(트림 막대 playhead 표시용).
+        let interval = CMTime(seconds: 0.05, preferredTimescale: 600)
+        periodicObserver = player.addPeriodicTimeObserver(
+            forInterval: interval, queue: .main
+        ) { [weak self] t in
+            let s = CMTimeGetSeconds(t)
+            Task { @MainActor [weak self] in
+                guard let self, self.reverseTimer == nil, s.isFinite else { return }
+                self.currentTime = max(0, s)
+            }
+        }
     }
 
     deinit {
         if let loopObserver {
             player.removeTimeObserver(loopObserver)
+        }
+        if let periodicObserver {
+            player.removeTimeObserver(periodicObserver)
         }
         reverseTimer?.invalidate()
     }
@@ -68,6 +85,7 @@ final class PreviewController: ObservableObject {
     func seek(to seconds: TimeInterval) {
         let time = CMTimeMakeWithSeconds(seconds, preferredTimescale: 600)
         player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+        currentTime = max(0, seconds)
     }
 
     /// 트림 구간을 갱신. 재생 중이고 현재 위치가 범위 밖이면 시작점으로 시킹.
@@ -80,6 +98,12 @@ final class PreviewController: ObservableObject {
             let cur = CMTimeGetSeconds(player.currentTime())
             if cur < rangeStart || cur >= rangeEnd {
                 seek(to: rangeStart)
+            }
+            // 끝을 현재 재생 위치보다 앞으로 당기면 앞에 경계가 없어
+            // AVPlayer 가 영상 끝(actionAtItemEnd=.pause)까지 가서 멈춰버린다.
+            // 정방향 재생 중이면 rate 를 다시 걸어 정지 상태를 방지.
+            if reverseTimer == nil {
+                player.rate = Float(currentSpeed)
             }
         }
     }
@@ -178,6 +202,7 @@ final class PreviewController: ObservableObject {
 
     private func reverseStep() {
         reverseTime -= currentSpeed / reverseHz
+        currentTime = max(0, reverseTime)
         if reverseTime <= rangeStart {
             stopReverse()
             let startCM = CMTimeMakeWithSeconds(rangeStart, preferredTimescale: 600)

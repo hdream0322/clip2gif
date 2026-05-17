@@ -8,6 +8,8 @@ struct TrimSlider: View {
     var onScrub: ((TimeInterval) -> Void)? = nil
     /// "현재 프리뷰 위치"를 반환 (시작/끝 지정 버튼용). nil 이면 버튼 숨김.
     var playheadSeconds: (() -> TimeInterval)? = nil
+    /// 현재 재생 위치(초). 트림 막대 위에 세로선으로 표시.
+    var playhead: TimeInterval = 0
 
     private let handleSize: CGFloat = 18
     private let trackHeight: CGFloat = 6
@@ -23,6 +25,8 @@ struct TrimSlider: View {
                 let safeDuration = max(duration, 0.0001)
                 let startX = CGFloat(startTime / safeDuration) * trackWidth + handleSize / 2
                 let endX = CGFloat(endTime / safeDuration) * trackWidth + handleSize / 2
+                let playClamped = min(max(playhead, 0), safeDuration)
+                let playX = CGFloat(playClamped / safeDuration) * trackWidth + handleSize / 2
 
                 ZStack(alignment: .leading) {
                     Capsule()
@@ -34,6 +38,12 @@ struct TrimSlider: View {
                         .fill(Color.accentColor.opacity(0.4))
                         .frame(width: max(0, endX - startX), height: trackHeight)
                         .offset(x: startX)
+
+                    // 현재 재생 위치 표시선 (핸들 아래 레이어).
+                    Capsule()
+                        .fill(Color.primary.opacity(0.75))
+                        .frame(width: 2, height: trackHeight + 12)
+                        .position(x: playX, y: geo.size.height / 2)
 
                     handleView(systemName: "chevron.left")
                         .position(x: startX, y: geo.size.height / 2)

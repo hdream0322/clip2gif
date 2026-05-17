@@ -215,6 +215,7 @@ struct ConvertButton: View {
 struct ResultPreviewSheet: View {
     let url: URL
     var onClose: () -> Void
+    @State private var copied = false
 
     private var pixelSize: CGSize {
         guard let img = NSImage(contentsOf: url) else {
@@ -230,6 +231,22 @@ struct ResultPreviewSheet: View {
         let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
         guard let n = attrs?[.size] as? NSNumber else { return nil }
         return OutputEstimator.formatted(bytes: n.int64Value)
+    }
+
+    /// GIF "만" 복사한다. NSImage 를 넣으면 받는 앱이 정지 jpg/tiff 로
+    /// 붙여넣으므로, 파일 URL + GIF 원본 데이터만 클립보드에 올린다.
+    private func copyGIF() {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.writeObjects([url as NSURL])
+        if let data = try? Data(contentsOf: url) {
+            pb.setData(data, forType: NSPasteboard.PasteboardType("com.compuserve.gif"))
+        }
+        copied = true
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            copied = false
+        }
     }
 
     var body: some View {
@@ -276,15 +293,15 @@ struct ResultPreviewSheet: View {
                     Label("열기", systemImage: "play.rectangle")
                 }
                 Button {
-                    let pb = NSPasteboard.general
-                    pb.clearContents()
-                    var items: [NSPasteboardWriting] = [url as NSURL]
-                    if let img = NSImage(contentsOf: url) { items.append(img) }
-                    pb.writeObjects(items)
+                    copyGIF()
                 } label: {
-                    Label("복사", systemImage: "doc.on.doc")
+                    Label(
+                        copied ? "복사됨" : "복사",
+                        systemImage: copied ? "checkmark.circle.fill" : "doc.on.doc"
+                    )
+                    .foregroundStyle(copied ? Color.green : Color.primary)
                 }
-                .help("GIF 파일과 이미지를 클립보드에 복사")
+                .help("GIF 파일을 클립보드에 복사")
                 Spacer()
                 Button("닫기", action: onClose)
                     .keyboardShortcut(.cancelAction)
