@@ -83,6 +83,14 @@ struct GifskiEncoder {
             "--quality", "\(settings.quality)"
         ]
 
+        // 고급(선택): 시간/공간 압축을 개별 제어.
+        if let mq = settings.motionQuality {
+            args += ["--motion-quality", "\(max(1, min(100, mq)))"]
+        }
+        if let lq = settings.lossyQuality {
+            args += ["--lossy-quality", "\(max(1, min(100, lq)))"]
+        }
+
         // 크기 축소 (100% 면 생략).
         if settings.scalePercent < 100 {
             let outSize = settings.pixelOutputSize(for: naturalSize)

@@ -139,11 +139,59 @@ struct SettingsPanel: View {
                         ), in: 1...100, step: 1)
                     }
                 }
+
+                DisclosureGroup("고급 압축") {
+                    advancedQualityRow(
+                        title: "모션 품질",
+                        help: "낮추면 프레임 간(시간) 압축이 강해져 용량이 줄지만 움직임이 거칠어집니다.",
+                        value: $settings.motionQuality
+                    )
+                    advancedQualityRow(
+                        title: "손실 품질",
+                        help: "낮추면 프레임 내(공간) 압축이 강해져 용량이 줄지만 노이즈/스트릭이 생깁니다.",
+                        value: $settings.lossyQuality
+                    )
+                }
             }
         }
         .formStyle(.grouped)
         .onAppear {
             qualityPreset = matchedPreset(for: settings.quality)
+        }
+    }
+
+    /// gifski 고급 옵션 1줄: 켜면 1~100 슬라이더, 끄면 nil(미지정=gifski 기본).
+    @ViewBuilder
+    private func advancedQualityRow(
+        title: String,
+        help: String,
+        value: Binding<Int?>
+    ) -> some View {
+        let isOn = Binding(
+            get: { value.wrappedValue != nil },
+            set: { value.wrappedValue = $0 ? (value.wrappedValue ?? 60) : nil }
+        )
+        VStack(alignment: .leading, spacing: 4) {
+            Toggle(isOn: isOn) {
+                HStack {
+                    Text(title)
+                    Spacer()
+                    if let v = value.wrappedValue {
+                        Text("\(v)").foregroundStyle(.secondary).monospacedDigit()
+                    } else {
+                        Text("기본").foregroundStyle(.tertiary)
+                    }
+                }
+            }
+            if let v = value.wrappedValue {
+                Slider(value: Binding(
+                    get: { Double(v) },
+                    set: { value.wrappedValue = Int($0) }
+                ), in: 1...100, step: 1)
+            }
+            Text(help)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 

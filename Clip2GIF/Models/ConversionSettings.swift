@@ -53,6 +53,10 @@ struct ConversionSettings: Equatable {
     var loopForever: Bool = true
     /// 끝에서 역재생으로 돌아오는 왕복(bounce/palindrome). 프레임을 [forward + reverse] 로 확장.
     var bounce: Bool = false
+    /// gifski --motion-quality (1~100). 낮추면 시간(프레임 간) 압축 강화. nil=미지정.
+    var motionQuality: Int? = nil
+    /// gifski --lossy-quality (1~100). 낮추면 공간 압축 강화(노이즈/스트릭). nil=미지정.
+    var lossyQuality: Int? = nil
 
     static let `default` = ConversionSettings()
 

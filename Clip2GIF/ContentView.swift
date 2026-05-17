@@ -41,6 +41,8 @@ struct ContentView: View {
             "\(settings.trimEnd)",
             "\(settings.speed)",
             "\(settings.bounce)",
+            "\(settings.motionQuality ?? -1)",
+            "\(settings.lossyQuality ?? -1)",
             "\(settings.cropRect)"
         ].joined(separator: "|")
     }
