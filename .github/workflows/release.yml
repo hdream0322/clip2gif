@@ -62,6 +62,39 @@ jobs:
           echo "Found app: $APP_PATH"
           scripts/sign-and-package.sh "$APP_PATH" "${{ steps.version.outputs.version }}"
 
+      - name: Write release notes (install guide)
+        run: |
+          RAW="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_REF_NAME}/docs/images"
+          cat > NOTES.md <<EOF
+          ## 설치 방법
+
+          1. 아래 \`Clip2GIF-${{ steps.version.outputs.version }}.dmg\`를 내려받아 열고, **Clip2GIF.app**을 **Applications** 폴더로 드래그합니다.
+          2. 이 앱은 Apple 공증을 하지 않아 처음 실행 시 보안 경고가 뜹니다 (정상). 한 번만 아래대로 허용하면 됩니다.
+
+          **방법 A — 시스템 설정에서 허용 (권장)**
+
+          1. \`Applications\`에서 **Clip2GIF**를 더블클릭 → 경고 창에서 **\`완료\`** 클릭.
+             ⚠️ **\`휴지통으로 이동\`은 누르지 마세요** (앱이 삭제됩니다).
+
+          <img src="${RAW}/install-1-first-warning.png" width="320" />
+
+          2. **시스템 설정 → 개인정보 보호 및 보안** → **보안**까지 스크롤 → *"Clip2GIF.app을(를) 차단했습니다"* 옆 **\`그래도 열기\`** 클릭.
+
+          <img src="${RAW}/install-2-allow-anyway.png" width="640" />
+
+          3. 다시 뜨는 확인 창에서 **\`열기\`** 클릭. 이후로는 바로 실행됩니다.
+
+          **방법 B — 터미널 한 줄**
+
+          \`\`\`bash
+          xattr -dr com.apple.quarantine /Applications/Clip2GIF.app
+          \`\`\`
+
+          > **지원 환경**: macOS 13.0+ · **Apple Silicon 전용** (Intel 맥 미지원).
+
+          ---
+          EOF
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -69,4 +102,5 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" \
             "dist/Clip2GIF-${{ steps.version.outputs.version }}.dmg" \
             --title "Clip2GIF ${{ steps.version.outputs.version }}" \
+            --notes-file NOTES.md \
             --generate-notes

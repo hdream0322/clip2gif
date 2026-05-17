@@ -20,14 +20,31 @@ macOS용 동영상 → GIF 변환 앱입니다. 비디오를 드래그하거나 
 
 1. [**Releases 페이지**](https://github.com/hdream0322/clip2gif/releases/latest)에서 최신 `Clip2GIF-x.y.z.dmg`를 내려받습니다.
 2. DMG를 열고 **Clip2GIF.app**을 **Applications** 폴더로 드래그합니다.
-3. 처음 실행 시 *"확인되지 않은 개발자"* 경고가 뜹니다. 이 앱은 Apple 공증(notarization)을 하지 않으므로 정상이며, 아래 중 한 방법으로 한 번만 허용하면 됩니다.
+3. 처음 실행하면 아래처럼 *"확인할 수 없습니다"* 경고가 뜹니다. 이 앱은 Apple 공증(notarization)을 하지 않아 생기는 **정상적인 화면**이며, 한 번만 허용해 주면 다음부터는 그냥 열립니다.
 
-   - **방법 A** — `Clip2GIF.app`을 한 번 실행해 경고를 띄운 뒤, **시스템 설정 → 개인정보 보호 및 보안**으로 가서 맨 아래 **"확인 없이 열기"** 버튼을 누릅니다.
-   - **방법 B (터미널)** — 격리 속성을 직접 제거합니다:
+   **방법 A — 시스템 설정에서 허용 (권장)**
 
-     ```bash
-     xattr -dr com.apple.quarantine /Applications/Clip2GIF.app
-     ```
+   1. `Applications`에서 **Clip2GIF**를 더블클릭하면 이 경고가 뜹니다. 여기서 **`완료`** 를 누릅니다.
+      <br>⚠️ **`휴지통으로 이동`은 절대 누르지 마세요** (앱이 삭제됩니다).
+
+      <p align="center">
+        <img src="docs/images/install-1-first-warning.png" alt="첫 실행 경고 — 완료를 누르세요" width="320" />
+      </p>
+
+   2. **시스템 설정 → 개인정보 보호 및 보안**을 열고, **보안** 항목까지 스크롤하면 *"Mac을 보호하기 위해 'Clip2GIF.app'을(를) 차단했습니다"* 가 보입니다. 옆의 **`그래도 열기`** 버튼을 누릅니다.
+
+      <p align="center">
+        <img src="docs/images/install-2-allow-anyway.png" alt="개인정보 보호 및 보안 — 그래도 열기" width="640" />
+      </p>
+
+   3. 다시 한번 확인 창이 뜨면 **`열기`** 를 누릅니다. 이후로는 일반 앱처럼 바로 실행됩니다.
+
+   **방법 B — 터미널 한 줄 (빠른 방법)**
+
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/Clip2GIF.app
+   ```
+   실행 후 앱을 열면 경고 없이 바로 실행됩니다.
 
 > **지원 환경**: macOS 13.0 이상, **Apple Silicon(M1/M2/M3 등) 전용**입니다. 현재 릴리스는 번들된 gifski 인코더가 arm64 전용이라 Intel 맥은 지원하지 않습니다.
 
