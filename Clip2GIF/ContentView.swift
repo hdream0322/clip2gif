@@ -670,6 +670,11 @@ struct ContentView: View {
                 DockProgress.set(nil)
                 // Finder 자동 노출은 제거 — 결과를 앱 내에서 바로 미리보고,
                 // 필요 시 완료 블록의 "Finder에서 보기" 버튼으로 연다.
+                // 긴 변환 후 다른 작업 중이면 완료를 놓치므로 알린다.
+                NSSound(named: "Glass")?.play()
+                if !NSApp.isActive {
+                    NSApp.requestUserAttention(.informationalRequest)
+                }
             }
         } catch let e as ConversionError {
             await MainActor.run {
