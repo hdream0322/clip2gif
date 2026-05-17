@@ -9,6 +9,15 @@ enum PreflightEstimator {
         let bytes: Int64
     }
 
+    /// 전체 프레임이 이 이하이면 회귀 없이 통째로 인코딩해 정답 반환.
+    private static let directEncodeThreshold = 16
+    /// 두-점 회귀용 윈도우 크기. 차이(large-small)가 프레임당 바이트의 분모.
+    private static let smallWindowCount = 4
+    private static let largeWindowCount = 12
+    /// 윈도우 시작 위치 비율(전체 프레임 대비) — 영상 앞/뒤 치우침 완화.
+    private static let smallWindowStartFraction = 0.25   // totalFrames * 1/4
+    private static let largeWindowStartFraction = 0.625  // totalFrames * 5/8
+
     /// 작은 윈도우 4프레임, 큰 윈도우 12프레임 동시에 인코딩 → 선형 외삽.
     /// 전체 프레임이 16 이하이면 그냥 다 인코딩한 결과를 정답으로 반환.
     static func estimate(
@@ -20,7 +29,7 @@ enum PreflightEstimator {
         let outputDuration = max(0.0001, trim / speed)
         let totalFrames = max(1, Int(outputDuration * Double(settings.fps)))
 
-        if totalFrames <= 16 {
+        if totalFrames <= directEncodeThreshold {
             let size = try await encodeWindow(
                 source: source,
                 settings: settings,
@@ -30,22 +39,24 @@ enum PreflightEstimator {
             return Result(bytes: size)
         }
 
-        let smallStart = totalFrames / 4
-        let largeStart = totalFrames * 5 / 8
+        let smallStart = Int(Double(totalFrames) * smallWindowStartFraction)
+        let largeStart = Int(Double(totalFrames) * largeWindowStartFraction)
         async let smallSize = encodeWindow(
             source: source, settings: settings,
-            startFrameIndex: smallStart, count: 4
+            startFrameIndex: smallStart, count: smallWindowCount
         )
         async let largeSize = encodeWindow(
             source: source, settings: settings,
-            startFrameIndex: largeStart, count: 12
+            startFrameIndex: largeStart, count: largeWindowCount
         )
         let s1 = try await smallSize
         let s2 = try await largeSize
 
-        // (S2 - S1) / 8 = 정상상태 프레임당 바이트, S1 - 4*Δ = 헤더 베이스라인.
-        let perFrame = max(0, Double(s2 - s1) / 8.0)
-        let baseline = max(0, Double(s1) - 4 * perFrame)
+        // 두-점 선형 회귀: 정상상태 프레임당 바이트 = ΔBytes / ΔFrames,
+        // 헤더 베이스라인 = 작은 윈도우 - 작은 프레임수 * perFrame.
+        let deltaFrames = Double(largeWindowCount - smallWindowCount)
+        let perFrame = max(0, Double(s2 - s1) / deltaFrames)
+        let baseline = max(0, Double(s1) - Double(smallWindowCount) * perFrame)
         let total = baseline + perFrame * Double(totalFrames)
         return Result(bytes: Int64(total))
     }
@@ -61,19 +72,20 @@ enum PreflightEstimator {
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tempDir) }
 
-        let speed = max(0.1, settings.speed)
         let pixelCrop: CGRect? = settings.isFullFrame
             ? nil
             : settings.pixelCropRect(for: source.naturalSize)
 
-        let frames = try await extractWindow(
+        // 추출 로직은 FrameExtractor 의 단일 헬퍼를 인덱스만 다르게 호출.
+        // (클램프·취소·톤매핑이 한 곳에 집중되어 양쪽 불일치 위험 제거)
+        let indices = Array(startFrameIndex..<(startFrameIndex + count))
+        let frames = try await FrameExtractor.extractFrames(
             source: source,
             settings: settings,
-            startFrameIndex: startFrameIndex,
-            count: count,
-            speed: speed,
+            outputIndices: indices,
             pixelCrop: pixelCrop,
-            tempDir: tempDir
+            outputDir: tempDir,
+            fileName: { offset, _ in String(format: "p_%05d", offset) }
         )
 
         let gifURL = tempDir.appendingPathComponent("preflight.gif")
@@ -88,74 +100,4 @@ enum PreflightEstimator {
         return (attrs[.size] as? NSNumber)?.int64Value ?? 0
     }
 
-    private static func extractWindow(
-        source: VideoSource,
-        settings: ConversionSettings,
-        startFrameIndex: Int,
-        count: Int,
-        speed: Double,
-        pixelCrop: CGRect?,
-        tempDir: URL
-    ) async throws -> [URL] {
-        // 설정을 빠르게 바꾸면 preflightTask 가 취소되는데, 취소가 추출 루프와
-        // gifski 프로세스까지 전파돼야 좀비 프로세스가 누적되지 않는다.
-        let token = CancellationToken()
-        return try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[URL], Error>) in
-            DispatchQueue.global(qos: .userInitiated).async {
-                if token.isCancelled {
-                    continuation.resume(throwing: ConversionError.cancelled)
-                    return
-                }
-                let asset = AVURLAsset(url: source.url)
-                let generator = AVAssetImageGenerator(asset: asset)
-                generator.appliesPreferredTrackTransform = true
-                generator.requestedTimeToleranceBefore = CMTimeMake(value: 1, timescale: 600)
-                generator.requestedTimeToleranceAfter = CMTimeMake(value: 1, timescale: 600)
-
-                let trimStart = settings.trimStart
-                let trimEnd = settings.effectiveTrimEnd(duration: source.duration)
-
-                var urls: [URL] = []
-                urls.reserveCapacity(count)
-
-                for i in 0..<count {
-                    if token.isCancelled {
-                        continuation.resume(throwing: ConversionError.cancelled)
-                        return
-                    }
-                    let result: Swift.Result<URL, Error> = autoreleasepool {
-                        let outputIndex = startFrameIndex + i
-                        // FrameExtractor 와 동일하게 [start, end-epsilon] 클램프.
-                        // (startFrameIndex+i 가 totalFrames 를 넘어 영상 밖 시간을
-                        //  요청하면 copyCGImage 가 throw → 추정 전체 실패)
-                        let raw = trimStart
-                            + (Double(outputIndex) / Double(settings.fps)) * speed
-                        let seconds = min(raw, max(trimStart, trimEnd - 1.0 / 600.0))
-                        let time = CMTimeMakeWithSeconds(seconds, preferredTimescale: 600)
-                        do {
-                            let cg = try generator.copyCGImage(at: time, actualTime: nil)
-                            let cropped = FrameExtractor.applyCrop(cg, crop: pixelCrop) ?? cg
-                            let final = FrameExtractor.toneMappedSDR(cropped)
-                            let url = tempDir.appendingPathComponent(String(format: "p_%05d.png", i))
-                            try FrameExtractor.writePNG(final, to: url)
-                            return .success(url)
-                        } catch {
-                            return .failure(ConversionError.ioFailed(error.localizedDescription))
-                        }
-                    }
-                    switch result {
-                    case .success(let url): urls.append(url)
-                    case .failure(let err):
-                        continuation.resume(throwing: err)
-                        return
-                    }
-                }
-                continuation.resume(returning: urls)
-            }
-            }
-        } onCancel: {
-            token.cancel()
-        }
-    }
 }
