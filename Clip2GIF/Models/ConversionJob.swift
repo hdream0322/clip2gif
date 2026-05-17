@@ -76,6 +76,12 @@ final class ConversionJob: ObservableObject {
     @Published var startedAt: Date?
     @Published var totalFrames: Int = 0
     @Published var currentFrame: Int = 0
+    /// 배치(다중 파일) 진행. batchTotal>1 이면 배치 모드.
+    @Published var batchTotal: Int = 0
+    @Published var batchDone: Int = 0
+    @Published var batchFailures: Int = 0
+
+    var isBatch: Bool { batchTotal > 1 }
 
     /// 전체 변환 과정에서 프레임 추출이 차지하는 비중. 나머지가 인코딩.
     static let extractWeight: Double = 0.55
@@ -135,5 +141,8 @@ final class ConversionJob: ObservableObject {
         startedAt = nil
         totalFrames = 0
         currentFrame = 0
+        batchTotal = 0
+        batchDone = 0
+        batchFailures = 0
     }
 }

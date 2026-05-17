@@ -111,23 +111,21 @@ struct ContentView: View {
             lastPreflightKey = preflightKey
             schedulePreflight()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .vtgOpenVideoFile)) { note in
-            if let url = note.object as? URL { loadVideo(url: url) }
+        .onReceive(NotificationCenter.default.publisher(for: .vtgOpenVideoFile)) { _ in
+            intake(PendingOpenStore.shared.consumeAll())
         }
         .onReceive(NotificationCenter.default.publisher(for: .vtgRequestOpenFile)) { _ in
             openVideoPanel()
         }
         .onAppear {
-            if let url = PendingOpenStore.shared.consume() { loadVideo(url: url) }
+            intake(PendingOpenStore.shared.consumeAll())
         }
         .onDrop(of: [.movie, .fileURL], isTargeted: nil) { providers in
             // 변환 중에는 새 파일 드롭 무시 (진행 중 작업과 상태 충돌 방지).
             guard !job.isRunning else { return false }
-            return VideoDrop.handle(
-                providers,
-                onAccept: { loadVideo(url: $0) },
-                onReject: { rejectUnsupported($0) }
-            )
+            return VideoDrop.handleAll(providers) { urls in
+                intake(urls)
+            }
         }
     }
 
@@ -542,11 +540,131 @@ struct ContentView: View {
         dropError = "‘\(url.lastPathComponent)’ 은(는) 지원하지 않는 형식입니다.\n지원: \(SupportedVideo.displayList)"
     }
 
+    /// 드롭/Open With/서비스로 들어온 URL 들을 분기:
+    /// 0개 → 무시, 1개 → 단일 편집 화면, 2개+ → 배치 순차 변환.
+    private func intake(_ urls: [URL]) {
+        guard !job.isRunning else { return }
+        let supported = urls.filter { SupportedVideo.isSupported($0) }
+        if supported.isEmpty {
+            if let first = urls.first { rejectUnsupported(first) }
+            return
+        }
+        if supported.count == 1 {
+            loadVideo(url: supported[0])
+        } else {
+            startBatch(supported)
+        }
+    }
+
+    private func startBatch(_ urls: [URL]) {
+        conversionTask = Task { await runBatch(urls) }
+    }
+
+    /// 배치 변환: 각 파일을 현재 화질/스케일/반복/속도 선호로 통째 변환.
+    /// 크롭·트림은 파일마다 의미가 없으므로 전체 프레임·전체 구간 고정.
+    private func runBatch(_ urls: [URL]) async {
+        await MainActor.run {
+            source = nil
+            preview.pause()
+            job.reset()
+            job.startedAt = Date()
+            job.batchTotal = urls.count
+            job.batchDone = 0
+            job.stepName = "배치 변환 0/\(urls.count)"
+            job.state = .extracting(progress: 0)
+            DockProgress.set(0.001)
+        }
+
+        var lastOutputDir: URL?
+
+        for (idx, url) in urls.enumerated() {
+            if Task.isCancelled { break }
+            await MainActor.run {
+                job.stepName = "배치 변환 \(idx + 1)/\(urls.count)"
+                job.detail = url.lastPathComponent
+                job.state = .extracting(progress: 0)
+            }
+
+            let tempDir = FileManager.default.temporaryDirectory
+                .appendingPathComponent("clip2gif-\(UUID().uuidString)")
+            do {
+                let loaded = try await VideoLoader.load(url: url)
+                var s = ConversionSettings.default
+                s.quality = prefQuality
+                s.speed = prefSpeed
+                s.scalePercent = prefScalePercent
+                s.loopForever = prefLoopForever
+                s.bounce = prefBounce
+                s.fps = max(6, Int(loaded.frameRate.rounded()))
+                // crop/trim 은 기본값(전체 프레임·전체 길이) 유지.
+
+                try FileManager.default.createDirectory(
+                    at: tempDir,
+                    withIntermediateDirectories: true,
+                    attributes: [.posixPermissions: 0o700]
+                )
+                defer { try? FileManager.default.removeItem(at: tempDir) }
+
+                let baseDir = customOutputDir ?? url.deletingLastPathComponent()
+                let stem = url.deletingPathExtension().lastPathComponent + "_converted"
+                let outputURL = Self.uniqueOutputURL(in: baseDir, stem: stem, ext: "gif")
+
+                let frames = try await FrameExtractor.extract(
+                    from: loaded, settings: s, outputDir: tempDir
+                ) { p in
+                    Task { @MainActor in job.state = .extracting(progress: p) }
+                }
+                await MainActor.run { job.state = .encoding(progress: 0) }
+                try await GifskiEncoder.encode(
+                    frames: frames, settings: s,
+                    naturalSize: loaded.naturalSize, output: outputURL
+                ) { p in
+                    Task { @MainActor in job.state = .encoding(progress: p) }
+                }
+                lastOutputDir = baseDir
+                await MainActor.run { job.batchDone += 1 }
+            } catch let e as ConversionError where e == .cancelled {
+                try? FileManager.default.removeItem(at: tempDir)
+                break
+            } catch is CancellationError {
+                try? FileManager.default.removeItem(at: tempDir)
+                break
+            } catch {
+                try? FileManager.default.removeItem(at: tempDir)
+                let detail = (error as? ConversionError)?.debugDetail
+                    ?? error.localizedDescription
+                NSLog("[Clip2GIF] batch skip %@: %@", url.lastPathComponent, detail)
+                await MainActor.run { job.batchFailures += 1 }
+            }
+        }
+
+        await MainActor.run {
+            DockProgress.set(nil)
+            if Task.isCancelled {
+                job.reset()
+            } else {
+                let doneCount = job.batchDone
+                let failCount = job.batchFailures
+                job.stepName = "배치 완료"
+                job.detail = "성공 \(doneCount) · 실패 \(failCount)"
+                if let dir = lastOutputDir {
+                    job.state = .done(dir)
+                } else {
+                    job.state = .failed(.ioFailed("변환된 파일이 없습니다."))
+                }
+                NSSound(named: "Glass")?.play()
+                if !NSApp.isActive {
+                    NSApp.requestUserAttention(.informationalRequest)
+                }
+            }
+        }
+    }
+
     /// ⌘O / "열기…" 메뉴 → 파일 선택 패널. 영상 유무와 무관하게 동작.
     private func openVideoPanel() {
         let panel = NSOpenPanel()
         panel.title = "비디오 파일 선택"
-        panel.allowsMultipleSelection = false
+        panel.allowsMultipleSelection = true   // 여러 개 선택 시 배치 변환
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
         var allowed: [UTType] = [.movie, .video, .quickTimeMovie, .mpeg4Movie]
@@ -554,8 +672,8 @@ struct ContentView: View {
             if let t = UTType(filenameExtension: ext) { allowed.append(t) }
         }
         panel.allowedContentTypes = allowed
-        if panel.runModal() == .OK, let url = panel.url {
-            loadVideo(url: url)
+        if panel.runModal() == .OK {
+            intake(panel.urls)
         }
     }
 

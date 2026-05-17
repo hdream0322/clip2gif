@@ -11,16 +11,18 @@ extension Notification.Name {
 final class PendingOpenStore {
     static let shared = PendingOpenStore()
     private let lock = NSLock()
-    private var url: URL?
+    private var queue: [URL] = []
 
     func push(_ u: URL) {
-        lock.lock(); url = u; lock.unlock()
-        NotificationCenter.default.post(name: .vtgOpenVideoFile, object: u)
+        lock.lock(); queue.append(u); lock.unlock()
+        NotificationCenter.default.post(name: .vtgOpenVideoFile, object: nil)
     }
 
-    func consume() -> URL? {
+    /// 누적된 모든 URL 을 비우며 반환 (단일/다중 파일 모두 보존 — 마지막
+    /// 하나만 남던 버그 수정. 호출부가 1개=단일, N개=배치로 분기).
+    func consumeAll() -> [URL] {
         lock.lock(); defer { lock.unlock() }
-        let u = url; url = nil; return u
+        let all = queue; queue = []; return all
     }
 }
 

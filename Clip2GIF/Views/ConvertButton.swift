@@ -30,7 +30,11 @@ struct ConvertButton: View {
             if job.isRunning {
                 progressBlock
             } else if case .done(let url) = job.state {
-                doneBlock(url: url)
+                if job.isBatch {
+                    batchDoneBlock(dir: url)
+                } else {
+                    doneBlock(url: url)
+                }
             } else if case .failed(let err) = job.state {
                 Text(err.errorDescription ?? "오류가 발생했습니다.")
                     .font(.caption)
@@ -64,17 +68,32 @@ struct ConvertButton: View {
 
     @ViewBuilder
     private var progressBlock: some View {
-        ProgressView(value: job.overallProgress)
+        if job.batchTotal > 0 {
+            ProgressView(
+                value: Double(job.batchDone),
+                total: Double(max(1, job.batchTotal))
+            )
             .progressViewStyle(.linear)
             .frame(maxWidth: .infinity)
+        } else {
+            ProgressView(value: job.overallProgress)
+                .progressViewStyle(.linear)
+                .frame(maxWidth: .infinity)
+        }
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(job.stepName)
                     .font(.subheadline.bold())
                 Spacer()
-                Text("\(Int(job.overallProgress * 100))%")
-                    .font(.subheadline.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                if job.batchTotal > 0 {
+                    Text("\(job.batchDone)/\(job.batchTotal)")
+                        .font(.subheadline.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("\(Int(job.overallProgress * 100))%")
+                        .font(.subheadline.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
             }
             if !job.detail.isEmpty {
                 Text(job.detail)
@@ -135,6 +154,31 @@ struct ConvertButton: View {
             .buttonStyle(.bordered)
             .controlSize(.small)
         }
+    }
+
+    @ViewBuilder
+    private func batchDoneBlock(dir: URL) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label("배치 완료", systemImage: "checkmark.circle.fill")
+                .font(.subheadline.bold())
+                .foregroundStyle(.green)
+            Text(verbatim: batchSummaryText)
+                .font(.callout.monospacedDigit())
+                .foregroundStyle(.secondary)
+            Button {
+                NSWorkspace.shared.activateFileViewerSelecting([dir])
+            } label: {
+                Label("폴더 열기", systemImage: "folder")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+    }
+
+    private var batchSummaryText: String {
+        var t = "성공 \(job.batchDone)개"
+        if job.batchFailures > 0 { t += " · 실패 \(job.batchFailures)개" }
+        return t
     }
 
     private var buttonLabel: String {

@@ -38,6 +38,51 @@ enum VideoDrop {
         }
         return false
     }
+
+    /// 여러 프로바이더(다중 파일 드롭)에서 URL 을 모두 수집해 한 번에 전달.
+    /// 비동기 로드가 모두 끝나면 메인 스레드에서 onCollected 1회 호출.
+    @discardableResult
+    static func handleAll(
+        _ providers: [NSItemProvider],
+        onCollected: @escaping ([URL]) -> Void
+    ) -> Bool {
+        let candidates = providers.filter {
+            $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier)
+                || $0.hasItemConformingToTypeIdentifier(UTType.movie.identifier)
+        }
+        guard !candidates.isEmpty else { return false }
+
+        let group = DispatchGroup()
+        let lock = NSLock()
+        var collected: [URL] = []
+
+        for provider in candidates {
+            group.enter()
+            let done: (URL?) -> Void = { url in
+                if let url {
+                    lock.lock(); collected.append(url); lock.unlock()
+                }
+                group.leave()
+            }
+            if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+                provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) { item, _ in
+                    if let data = item as? Data,
+                       let url = URL(dataRepresentation: data, relativeTo: nil) {
+                        done(url)
+                    } else { done(nil) }
+                }
+            } else {
+                provider.loadItem(forTypeIdentifier: UTType.movie.identifier) { item, _ in
+                    done(item as? URL)
+                }
+            }
+        }
+
+        group.notify(queue: .main) {
+            onCollected(collected)
+        }
+        return true
+    }
 }
 
 /// 지원 비디오 형식의 단일 소스 of truth.
