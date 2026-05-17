@@ -1,5 +1,44 @@
 import Foundation
 import CoreGraphics
+import UniformTypeIdentifiers
+
+/// 드롭 프로바이더 처리의 단일 구현. ContentView.onDrop 과
+/// DropZoneView.handleDrop 이 거의 동일한 로직을 복제하던 것을 통합.
+enum VideoDrop {
+    /// 첫 프로바이더에서 비디오 URL 을 로드. 처리 시작했으면 true.
+    /// onAccept/onReject 는 메인 스레드로 디스패치되어 호출된다.
+    @discardableResult
+    static func handle(
+        _ providers: [NSItemProvider],
+        onAccept: @escaping (URL) -> Void,
+        onReject: @escaping (URL) -> Void
+    ) -> Bool {
+        guard let provider = providers.first else { return false }
+
+        func deliver(_ url: URL) {
+            DispatchQueue.main.async {
+                SupportedVideo.isSupported(url) ? onAccept(url) : onReject(url)
+            }
+        }
+
+        if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) { item, _ in
+                if let data = item as? Data,
+                   let url = URL(dataRepresentation: data, relativeTo: nil) {
+                    deliver(url)
+                }
+            }
+            return true
+        }
+        if provider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
+            provider.loadItem(forTypeIdentifier: UTType.movie.identifier) { item, _ in
+                if let url = item as? URL { deliver(url) }
+            }
+            return true
+        }
+        return false
+    }
+}
 
 /// 지원 비디오 형식의 단일 소스 of truth.
 /// (드롭/Finder 서비스/Open With/파일 패널 세 곳에 하드코딩 복제돼 있던 것을 통합)

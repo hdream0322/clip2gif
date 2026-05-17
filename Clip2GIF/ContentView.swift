@@ -119,22 +119,11 @@ struct ContentView: View {
             if let url = PendingOpenStore.shared.consume() { loadVideo(url: url) }
         }
         .onDrop(of: [.movie, .fileURL], isTargeted: nil) { providers in
-            guard let provider = providers.first else { return false }
-            if provider.hasItemConformingToTypeIdentifier("public.file-url") {
-                provider.loadItem(forTypeIdentifier: "public.file-url") { item, _ in
-                    guard let data = item as? Data,
-                          let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
-                    DispatchQueue.main.async {
-                        if SupportedVideo.isSupported(url) {
-                            loadVideo(url: url)
-                        } else {
-                            dropError = "‘\(url.lastPathComponent)’ 은(는) 지원하지 않는 형식입니다.\n지원: \(SupportedVideo.displayList)"
-                        }
-                    }
-                }
-                return true
-            }
-            return false
+            VideoDrop.handle(
+                providers,
+                onAccept: { loadVideo(url: $0) },
+                onReject: { rejectUnsupported($0) }
+            )
         }
     }
 
@@ -249,9 +238,7 @@ struct ContentView: View {
             } else {
                 DropZoneView(
                     onDrop: { url in loadVideo(url: url) },
-                    onReject: { url in
-                        dropError = "‘\(url.lastPathComponent)’ 은(는) 지원하지 않는 형식입니다.\n지원: \(SupportedVideo.displayList)"
-                    }
+                    onReject: { url in rejectUnsupported(url) }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -288,7 +275,10 @@ struct ContentView: View {
             ConvertButton(
                 job: job,
                 start: {
-                    conversionTask?.cancel()
+                    // 동기 가드 — 진행 중이면 무시 (빠른 연타로 두 변환 Task 가
+                    // 같은 출력 경로/임시 로직을 경합하는 것 방지). 메인 액터에서
+                    // 호출되므로 job.isRunning 읽기는 안전.
+                    guard !job.isRunning else { return }
                     conversionTask = Task { await convert() }
                 },
                 cancel: {
@@ -530,6 +520,11 @@ struct ContentView: View {
                 self.preview.pause()
             }
         }
+    }
+
+    /// 미지원 파일이 들어왔을 때 공통 안내 (드롭/파일패널 모두 재사용).
+    private func rejectUnsupported(_ url: URL) {
+        dropError = "‘\(url.lastPathComponent)’ 은(는) 지원하지 않는 형식입니다.\n지원: \(SupportedVideo.displayList)"
     }
 
     /// ⌘O / "열기…" 메뉴 → 파일 선택 패널. 영상 유무와 무관하게 동작.

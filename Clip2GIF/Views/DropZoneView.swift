@@ -68,29 +68,6 @@ struct DropZoneView: View {
     }
 
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
-        guard let provider = providers.first else { return false }
-
-        if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
-            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) { item, _ in
-                guard let data = item as? Data,
-                      let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
-                DispatchQueue.main.async {
-                    SupportedVideo.isSupported(url) ? onDrop(url) : onReject(url)
-                }
-            }
-            return true
-        }
-
-        if provider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
-            provider.loadItem(forTypeIdentifier: UTType.movie.identifier) { item, _ in
-                guard let url = item as? URL else { return }
-                DispatchQueue.main.async {
-                    SupportedVideo.isSupported(url) ? onDrop(url) : onReject(url)
-                }
-            }
-            return true
-        }
-
-        return false
+        VideoDrop.handle(providers, onAccept: onDrop, onReject: onReject)
     }
 }
