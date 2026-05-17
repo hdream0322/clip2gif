@@ -27,8 +27,12 @@ build/
 # App artifacts
 *.gif
 
-# gifski binary (user supplies via bootstrap.sh)
-VideoToGif/Resources/bin/gifski
+# Local release output (DMGs are published via CI, not committed)
+dist/
+
+# NOTE: the bundled gifski (Clip2GIF/Resources/bin/gifski) is intentionally
+# committed so CI can build without Homebrew. Run scripts/bootstrap.sh locally
+# only to refresh it to a newer version.
 
 # OMC / Claude Code internal state (keep .omc/plans/ only)
 .omc/state/

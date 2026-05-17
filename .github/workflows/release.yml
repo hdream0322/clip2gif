@@ -1,0 +1,64 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    # Apple Silicon runner — matches the committed arm64 gifski binary.
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build tooling
+        run: brew install xcodegen create-dmg
+
+      - name: Derive version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate Xcode project
+        # bootstrap.sh requires gifski on PATH; instead use the committed
+        # arm64 gifski binary (Clip2GIF/Resources/bin/gifski) and just
+        # regenerate the project.
+        run: xcodegen generate
+
+      - name: Build (Release)
+        env:
+          CI: "true"
+        run: |
+          xcodebuild \
+            -project Clip2GIF.xcodeproj \
+            -scheme Clip2GIF \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            MARKETING_VERSION="${{ steps.version.outputs.version }}" \
+            clean build
+
+      - name: Sign (ad-hoc) and package DMG
+        run: |
+          APP_PATH="$(/usr/bin/find build/Build/Products/Release \
+            -maxdepth 1 -name 'Clip2GIF.app' -print -quit)"
+          if [ -z "$APP_PATH" ]; then
+            echo "Built app not found" >&2
+            exit 1
+          fi
+          echo "Found app: $APP_PATH"
+          scripts/sign-and-package.sh "$APP_PATH" "${{ steps.version.outputs.version }}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            "dist/Clip2GIF-${{ steps.version.outputs.version }}.dmg" \
+            --title "Clip2GIF ${{ steps.version.outputs.version }}" \
+            --generate-notes

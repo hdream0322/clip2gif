@@ -10,6 +10,29 @@
 
 macOS용 동영상 → GIF 변환 앱입니다. 비디오를 드래그하거나 Finder에서 바로 불러와 구간·영역·품질을 조정하고 GIF로 내보냅니다. 네이티브 SwiftUI 앱이며, 프레임 추출은 AVFoundation, 인코딩은 번들된 [gifski](https://gif.ski) 바이너리를 사용합니다.
 
+## 다운로드 & 설치
+
+<p align="center">
+  <a href="https://github.com/hdream0322/clip2gif/releases/latest">
+    <img src="https://img.shields.io/github/v/release/hdream0322/clip2gif?label=download&style=for-the-badge" alt="최신 릴리스 다운로드" />
+  </a>
+</p>
+
+1. [**Releases 페이지**](https://github.com/hdream0322/clip2gif/releases/latest)에서 최신 `Clip2GIF-x.y.z.dmg`를 내려받습니다.
+2. DMG를 열고 **Clip2GIF.app**을 **Applications** 폴더로 드래그합니다.
+3. 처음 실행 시 *"확인되지 않은 개발자"* 경고가 뜹니다. 이 앱은 Apple 공증(notarization)을 하지 않으므로 정상이며, 아래 중 한 방법으로 한 번만 허용하면 됩니다.
+
+   - **방법 A** — `Clip2GIF.app`을 한 번 실행해 경고를 띄운 뒤, **시스템 설정 → 개인정보 보호 및 보안**으로 가서 맨 아래 **"확인 없이 열기"** 버튼을 누릅니다.
+   - **방법 B (터미널)** — 격리 속성을 직접 제거합니다:
+
+     ```bash
+     xattr -dr com.apple.quarantine /Applications/Clip2GIF.app
+     ```
+
+> **지원 환경**: macOS 13.0 이상, **Apple Silicon(M1/M2/M3 등) 전용**입니다. 현재 릴리스는 번들된 gifski 인코더가 arm64 전용이라 Intel 맥은 지원하지 않습니다.
+
+소스에서 직접 빌드하려면 아래 [설정](#설정) 섹션을 참고하세요.
+
 ## 주요 기능
 
 - **구간 자르기 (Trim)** — 시작/끝 지점을 슬라이더로 지정

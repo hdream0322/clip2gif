@@ -27,6 +27,10 @@ targets:
       - name: "Install to /Applications"
         script: |
           set -e
+          if [ -n "${CI:-}" ]; then
+            echo "CI environment detected: skipping /Applications install"
+            exit 0
+          fi
           SRC="$TARGET_BUILD_DIR/$WRAPPER_NAME"
           DEST="/Applications/$WRAPPER_NAME"
           if [ -d "$SRC" ]; then
@@ -38,6 +42,8 @@ targets:
     settings:
       base:
         PRODUCT_NAME: Clip2GIF
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
         MACOSX_DEPLOYMENT_TARGET: "13.0"
         ENABLE_HARDENED_RUNTIME: NO
         SWIFT_VERSION: "5.9"
@@ -49,6 +55,8 @@ targets:
       path: Clip2GIF/Info.plist
       properties:
         CFBundleIconName: AppIcon
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NSHighResolutionCapable: true
         CFBundleDevelopmentRegion: en
         CFBundleLocalizations:
