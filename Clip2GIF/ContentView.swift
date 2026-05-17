@@ -119,7 +119,9 @@ struct ContentView: View {
             if let url = PendingOpenStore.shared.consume() { loadVideo(url: url) }
         }
         .onDrop(of: [.movie, .fileURL], isTargeted: nil) { providers in
-            VideoDrop.handle(
+            // 변환 중에는 새 파일 드롭 무시 (진행 중 작업과 상태 충돌 방지).
+            guard !job.isRunning else { return false }
+            return VideoDrop.handle(
                 providers,
                 onAccept: { loadVideo(url: $0) },
                 onReject: { rejectUnsupported($0) }
@@ -222,6 +224,7 @@ struct ContentView: View {
                     }
                     .buttonStyle(.bordered)
                 }
+                .disabled(job.isRunning)
 
                 TrimSlider(
                     startTime: $settings.trimStart,
@@ -235,6 +238,7 @@ struct ContentView: View {
                     }
                 )
                 .padding(.horizontal, 4)
+                .disabled(job.isRunning)
             } else {
                 DropZoneView(
                     onDrop: { url in loadVideo(url: url) },
@@ -257,6 +261,7 @@ struct ContentView: View {
                 videoFrameRate: source?.frameRate ?? 30
             )
                 .frame(maxHeight: .infinity, alignment: .top)
+                .disabled(job.isRunning)
 
             if let source = source {
                 cropInfo(source: source)
@@ -306,7 +311,7 @@ struct ContentView: View {
                 aspectRatio: settings.normalizedBoxRatio(for: source.naturalSize)
             )
                 .aspectRatio(aspect, contentMode: .fit)
-                .allowsHitTesting(true)
+                .allowsHitTesting(!job.isRunning)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -552,6 +557,8 @@ struct ContentView: View {
     }
 
     private func loadVideo(url: URL) {
+        // 변환 중에는 파일 교체 무시 (드롭/⌘O/Open With/서비스 모든 경로 차단).
+        guard !job.isRunning else { return }
         Task {
             do {
                 let loaded = try await VideoLoader.load(url: url)
