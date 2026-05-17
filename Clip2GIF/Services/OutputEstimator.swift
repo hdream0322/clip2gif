@@ -3,11 +3,17 @@ import CoreGraphics
 
 /// GIF 출력 용량 추정. 콘텐츠 복잡도에 따라 ±3배까지 차이 나므로 범위로 표시.
 enum OutputEstimator {
+    /// 프레임당 픽셀당 바이트 회귀: base + (quality/100)*slope.
+    /// 복잡한 동적 콘텐츠 기준 상한값. 정적 콘텐츠는 이의 staticContentRatio 수준.
+    private static let bppBase = 0.003
+    private static let bppQualitySlope = 0.030
+    /// 정적 콘텐츠는 복잡 콘텐츠 대비 ~30% 용량 → 범위 하한 계수.
+    private static let staticContentRatio = 0.30
+
     /// 프레임당 픽셀당 평균 바이트(LZW + 팔레트 압축 + 프레임간 중복 가정).
-    /// 복잡한 동적 콘텐츠 기준 상한값. 정적 콘텐츠는 이의 1/3 수준.
     private static func bytesPerPixel(quality: Int) -> Double {
         let q = max(1, min(100, quality))
-        return 0.003 + (Double(q) / 100.0) * 0.030
+        return bppBase + (Double(q) / 100.0) * bppQualitySlope
     }
 
     struct Range {
@@ -35,7 +41,7 @@ enum OutputEstimator {
         let pixelsPerFrame = max(0, cropPixelSize.width * cropPixelSize.height)
         let basis = pixelsPerFrame * frames * bytesPerPixel(quality: quality)
         // 정적 콘텐츠 ~30%, 복잡 콘텐츠 ~100%(상한)
-        return Range(low: Int64(basis * 0.30), high: Int64(basis))
+        return Range(low: Int64(basis * staticContentRatio), high: Int64(basis))
     }
 
     static func formatted(bytes: Int64) -> String {
