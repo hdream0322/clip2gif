@@ -81,3 +81,11 @@ killall pbs
 ## 라이선스
 
 개인용 프로젝트입니다. 코드 서명·notarization 없이 로컬 빌드로 사용합니다.
+
+이 앱은 GIF 인코딩에 [gifski](https://gif.ski)(`AGPL-3.0-only`) 바이너리를
+번들·재배포합니다. gifski는 라이브러리로 링크하지 않고 별도 프로세스로
+호출하므로 본 앱 소스에는 copyleft가 전파되지 않으나, 재배포되는 gifski
+바이너리에는 AGPL-3.0 의무가 적용됩니다. 라이선스 전문은
+[`Clip2GIF/Resources/bin/gifski-LICENSE.txt`](Clip2GIF/Resources/bin/gifski-LICENSE.txt),
+대응 소스 출처·고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)를
+참조하세요.
