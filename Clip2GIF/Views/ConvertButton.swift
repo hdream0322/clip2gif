@@ -275,6 +275,16 @@ struct ResultPreviewSheet: View {
                 } label: {
                     Label("열기", systemImage: "play.rectangle")
                 }
+                Button {
+                    let pb = NSPasteboard.general
+                    pb.clearContents()
+                    var items: [NSPasteboardWriting] = [url as NSURL]
+                    if let img = NSImage(contentsOf: url) { items.append(img) }
+                    pb.writeObjects(items)
+                } label: {
+                    Label("복사", systemImage: "doc.on.doc")
+                }
+                .help("GIF 파일과 이미지를 클립보드에 복사")
                 Spacer()
                 Button("닫기", action: onClose)
                     .keyboardShortcut(.cancelAction)

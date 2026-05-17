@@ -67,10 +67,13 @@ struct TrimSlider: View {
             }
             .frame(height: 30)
 
+            let safeDuration = max(duration, 0.0001)
             HStack(spacing: 6) {
                 endpointControl(
                     title: "시작",
                     time: startTime,
+                    canMinus: startTime > 0.0001,
+                    canPlus: startTime + fineStep <= endTime - snap + 1e-6,
                     onMinus: { setStart(startTime - fineStep) },
                     onPlus: { setStart(startTime + fineStep) },
                     onPlayhead: playheadSeconds.map { ph in { setStart(ph()) } }
@@ -83,6 +86,8 @@ struct TrimSlider: View {
                 endpointControl(
                     title: "끝",
                     time: endTime,
+                    canMinus: endTime - fineStep >= startTime + snap - 1e-6,
+                    canPlus: endTime < safeDuration - 0.0001,
                     onMinus: { setEnd(endTime - fineStep) },
                     onPlus: { setEnd(endTime + fineStep) },
                     onPlayhead: playheadSeconds.map { ph in { setEnd(ph()) } }
@@ -91,11 +96,15 @@ struct TrimSlider: View {
         }
     }
 
-    /// 끝점 1개에 대한 미세조정(±0.1s)·시간표시·"현재위치" 버튼 묶음.
+    /// 끝점 1개에 대한 미세조정(±0.1s)·시간표시·"현재 위치 지정" 버튼 묶음.
+    /// 한계(시작=0 / 끝=영상끝 등)에선 해당 버튼을 비활성화해 "왜 안 움직이지?"
+    /// 혼동을 없앤다.
     @ViewBuilder
     private func endpointControl(
         title: String,
         time: TimeInterval,
+        canMinus: Bool,
+        canPlus: Bool,
         onMinus: @escaping () -> Void,
         onPlus: @escaping () -> Void,
         onPlayhead: (() -> Void)?
@@ -104,15 +113,25 @@ struct TrimSlider: View {
             Text(title).font(.caption).foregroundStyle(.secondary)
             Button(action: onMinus) { Image(systemName: "minus") }
                 .buttonStyle(.borderless)
+                .disabled(!canMinus)
+                .help("\(title) 0.1초 앞으로")
             Text(formatTime(time))
                 .font(.callout.monospacedDigit())
                 .frame(minWidth: 56)
             Button(action: onPlus) { Image(systemName: "plus") }
                 .buttonStyle(.borderless)
+                .disabled(!canPlus)
+                .help("\(title) 0.1초 뒤로")
             if let onPlayhead {
-                Button(action: onPlayhead) { Image(systemName: "smallcircle.filled.circle") }
-                    .buttonStyle(.borderless)
-                    .help("현재 프리뷰 위치를 \(title)으로")
+                Button(action: onPlayhead) {
+                    Text("현재")
+                        .font(.caption2)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Color.secondary.opacity(0.15), in: Capsule())
+                }
+                .buttonStyle(.borderless)
+                .help("재생 막대(프리뷰)의 현재 위치를 \(title) 지점으로 지정")
             }
         }
         .font(.caption)
