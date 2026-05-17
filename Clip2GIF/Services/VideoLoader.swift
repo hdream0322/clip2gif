@@ -1,5 +1,4 @@
 import AVFoundation
-import AppKit
 
 enum VideoLoader {
     static func load(url: URL) async throws -> VideoSource {
@@ -43,18 +42,6 @@ enum VideoLoader {
 
         let durationSeconds = CMTimeGetSeconds(duration)
 
-        let generator = AVAssetImageGenerator(asset: asset)
-        generator.apertureMode = .productionAperture
-        generator.appliesPreferredTrackTransform = true
-
-        let thumbnail: NSImage
-        do {
-            let (cgImage, _) = try await generator.image(at: .zero)
-            thumbnail = NSImage(cgImage: cgImage, size: naturalSize)
-        } catch let error as AVError {
-            throw ConversionError.ioFailed("loadFailed: \(error.localizedDescription)")
-        }
-
-        return VideoSource(url: url, duration: durationSeconds, naturalSize: naturalSize, frameRate: frameRate, thumbnail: thumbnail)
+        return VideoSource(url: url, duration: durationSeconds, naturalSize: naturalSize, frameRate: frameRate)
     }
 }
