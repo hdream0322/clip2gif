@@ -34,12 +34,14 @@ enum ConversionError: LocalizedError, Equatable {
     case binaryTampered
     case tooManyFrames(Int)
 
+    /// 사용자 표시용 — 시스템 경로·gifski stderr 같은 내부 정보를 노출하지
+    /// 않도록 일반화한다. 상세는 debugDetail 로 콘솔에만 남긴다.
     var errorDescription: String? {
         switch self {
-        case .ioFailed(let msg):
-            return "파일 입출력 오류: \(msg)"
-        case .gifskiCrashed(let code, let stderr):
-            return "GIF 인코더가 오류 코드 \(code)로 종료되었습니다. \(stderr)"
+        case .ioFailed:
+            return "파일을 처리하는 중 오류가 발생했습니다."
+        case .gifskiCrashed(let code, _):
+            return "GIF 인코딩에 실패했습니다. (코드 \(code))"
         case .unsupportedCodec:
             return "지원하지 않는 비디오 코덱입니다."
         case .cancelled:
@@ -50,6 +52,18 @@ enum ConversionError: LocalizedError, Equatable {
             return "gifski 실행 파일이 손상되었거나 변조되었습니다. 앱을 다시 설치하세요."
         case .tooManyFrames(let n):
             return "프레임이 너무 많습니다(\(n)개). 트림 구간을 줄이거나 FPS·속도를 조정하세요."
+        }
+    }
+
+    /// 콘솔 로그용 상세(사용자 비노출). 진단에 필요한 원문을 보존.
+    var debugDetail: String {
+        switch self {
+        case .ioFailed(let msg):
+            return "ioFailed: \(msg)"
+        case .gifskiCrashed(let code, let stderr):
+            return "gifskiCrashed(\(code)): \(stderr)"
+        default:
+            return errorDescription ?? String(describing: self)
         }
     }
 }

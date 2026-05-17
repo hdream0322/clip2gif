@@ -510,7 +510,7 @@ struct ContentView: View {
         NSWorkspace.shared.recycle([source.url]) { _, error in
             DispatchQueue.main.async {
                 if let error = error {
-                    alertError = .ioFailed(error.localizedDescription)
+                    report(.ioFailed(error.localizedDescription))
                     return
                 }
                 self.source = nil
@@ -520,6 +520,13 @@ struct ContentView: View {
                 self.preview.pause()
             }
         }
+    }
+
+    /// 에러를 사용자에게는 일반화된 메시지로 보여주고, 진단 상세는
+    /// 콘솔 로그로만 남긴다(시스템 경로·stderr 노출 방지).
+    private func report(_ e: ConversionError) {
+        NSLog("[Clip2GIF] %@", e.debugDetail)
+        alertError = e
     }
 
     /// 미지원 파일이 들어왔을 때 공통 안내 (드롭/파일패널 모두 재사용).
@@ -562,9 +569,9 @@ struct ContentView: View {
                 settings = s
                 preview.load(url: loaded.url)
             } catch let e as ConversionError {
-                alertError = e
+                report(e)
             } catch {
-                alertError = .ioFailed(error.localizedDescription)
+                report(.ioFailed(error.localizedDescription))
             }
         }
     }
@@ -576,13 +583,20 @@ struct ContentView: View {
         let stem = source.url.deletingPathExtension().lastPathComponent + "_converted"
         let outputURL = Self.uniqueOutputURL(in: baseDir, stem: stem, ext: "gif")
 
+        // 프리픽스를 둬서 시작 시 잔존물 청소가 우리 디렉터리만 안전하게
+        // 겨냥하도록 한다(비샌드박스라 temp 는 사용자 공용 — bare UUID 위험).
         let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString)
+            .appendingPathComponent("clip2gif-\(UUID().uuidString)")
 
         do {
-            try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+            // 0o700: 프레임 PNG 에 영상 화면이 평문으로 남으므로 소유자 전용.
+            try FileManager.default.createDirectory(
+                at: tempDir,
+                withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700]
+            )
         } catch {
-            await MainActor.run { alertError = .ioFailed(error.localizedDescription) }
+            await MainActor.run { report(.ioFailed(error.localizedDescription)) }
             return
         }
 
@@ -657,7 +671,7 @@ struct ContentView: View {
                     job.reset()
                 } else {
                     job.state = .failed(e)
-                    alertError = e
+                    report(e)
                 }
                 DockProgress.set(nil)
             }
@@ -671,7 +685,7 @@ struct ContentView: View {
             await MainActor.run {
                 job.state = .failed(e)
                 DockProgress.set(nil)
-                alertError = e
+                report(e)
             }
         }
     }
