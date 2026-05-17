@@ -17,6 +17,14 @@ struct ContentView: View {
     /// 진행 중인 변환 Task. 취소 시 cancel() 로 추출 루프·gifski 를 중단.
     @State private var conversionTask: Task<Void, Never>?
 
+    // 자주 쓰는 출력 설정을 영속화 — 영상마다 .default 로 초기화되던 마찰 제거.
+    // (trim/crop/fps 는 영상 의존이라 영속 대상에서 제외)
+    @AppStorage("pref.quality") private var prefQuality: Int = ConversionSettings.default.quality
+    @AppStorage("pref.speed") private var prefSpeed: Double = ConversionSettings.default.speed
+    @AppStorage("pref.scalePercent") private var prefScalePercent: Int = ConversionSettings.default.scalePercent
+    @AppStorage("pref.loopForever") private var prefLoopForever: Bool = ConversionSettings.default.loopForever
+    @AppStorage("pref.bounce") private var prefBounce: Bool = ConversionSettings.default.bounce
+
     /// 출력 파일 크기에 영향을 주는 설정만 모은 키. 이 값이 바뀔 때만 재추정.
     /// loopForever(무한반복)는 GIF 반복 플래그라 크기 불변 → 의도적으로 제외.
     private var preflightKey: String {
@@ -59,6 +67,16 @@ struct ContentView: View {
             Text("원본 영상 파일이 휴지통으로 이동됩니다. 변환에 사용할 영상이라면 주의하세요.")
         }
         .onChange(of: settings) { _ in
+            // 사용자 선호 영속화 (다음 영상 로드 시 복원). 영상이 있을 때만 —
+            // "파일 변경"/휴지통의 settings=.default 리셋이 선호값을
+            // 덮어쓰지 않도록 한다(그 경로는 source 가 먼저 nil 이 됨).
+            if source != nil {
+                prefQuality = settings.quality
+                prefSpeed = settings.speed
+                prefScalePercent = settings.scalePercent
+                prefLoopForever = settings.loopForever
+                prefBounce = settings.bounce
+            }
             if let s = source {
                 preview.setRange(
                     start: settings.trimStart,
@@ -499,10 +517,17 @@ struct ContentView: View {
             do {
                 let loaded = try await VideoLoader.load(url: url)
                 source = loaded
-                settings = .default
-                settings.trimEnd = loaded.duration
+                var s = ConversionSettings.default
+                // 영속된 사용자 선호 적용 (영상마다 리셋되던 마찰 제거).
+                s.quality = prefQuality
+                s.speed = prefSpeed
+                s.scalePercent = prefScalePercent
+                s.loopForever = prefLoopForever
+                s.bounce = prefBounce
+                s.trimEnd = loaded.duration
                 // 기본 FPS는 항상 원본 영상 프레임율과 동일하게.
-                settings.fps = max(6, Int(loaded.frameRate.rounded()))
+                s.fps = max(6, Int(loaded.frameRate.rounded()))
+                settings = s
                 preview.load(url: loaded.url)
             } catch let e as ConversionError {
                 alertError = e
