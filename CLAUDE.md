@@ -12,9 +12,9 @@ brew install xcodegen gifski        # 최초 1회
 ```
 
 - **새 `.swift` 파일을 추가/삭제하면 반드시 `xcodegen generate` 재실행** — `.xcodeproj`는 `project.yml`에서 생성되는 산출물이며 직접 편집 금지.
-- `VideoToGif/Info.plist`도 `project.yml`의 `info.properties`에서 생성됨 — 직접 편집 금지. NSServices/문서타입/다국어는 `project.yml`에서 수정.
-- GUI 빌드: `open VideoToGif.xcodeproj` → ⌘B 컴파일 / ⌘R 실행. 캐시 꼬임 시 ⇧⌘K.
-- 헤드리스 빌드: `xcodebuild -project VideoToGif.xcodeproj -scheme VideoToGif build`
+- `Clip2GIF/Info.plist`도 `project.yml`의 `info.properties`에서 생성됨 — 직접 편집 금지. NSServices/문서타입/다국어는 `project.yml`에서 수정.
+- GUI 빌드: `open Clip2GIF.xcodeproj` → ⌘B 컴파일 / ⌘R 실행. 캐시 꼬임 시 ⇧⌘K.
+- 헤드리스 빌드: `xcodebuild -project Clip2GIF.xcodeproj -scheme Clip2GIF build`
 - 빌드 성공 시 postBuildScript가 앱을 **`/Applications`에 자동 설치**하고 Launch Services를 갱신함 (Finder "Open With"/서비스 검증용).
 - **테스트 스위트 없음** — 개인용 프로젝트. 검증은 실제 영상으로 ⌘R 수동 변환 + Activity Monitor 메모리 확인.
 
@@ -37,7 +37,7 @@ macOS 네이티브 SwiftUI 앱. **단일 타겟·단일 모듈** → 같은 모�
 
 - **macOS 13 타겟**: `onChange(of:)`는 단일 파라미터 형태만 (`{ newValue in }`). `.foregroundStyle(.accent)` 미지원 → `Color.accentColor`. macOS 14 전용 API는 `#available` 분기 필수.
 - **메모리**: 프레임 추출은 직렬 동기 + per-frame `autoreleasepool` 필수. `generateCGImagesAsynchronously` 일괄 사용 금지 (고해상도에서 10GB+ 폭주 사례).
-- **gifski 접근**: `Bundle.main.url(forResource: "gifski", withExtension: nil)` — subdirectory 사용 금지. 바이너리 원본은 `VideoToGif/Resources/bin/gifski`, postBuildScript가 번들로 복사.
+- **gifski 접근**: `Bundle.main.url(forResource: "gifski", withExtension: nil)` — subdirectory 사용 금지. 바이너리 원본은 `Clip2GIF/Resources/bin/gifski`, postBuildScript가 번들로 복사.
 - **bounce(왕복)**: gifski 네이티브 `--bounce` 플래그로만 처리. 프레임 역순 수동 첨부 시 gifski가 파일명을 재정렬해 절반 속도 버그 발생.
 - **프리뷰 역재생**: AVPlayer 음수 rate 사용 금지 (키프레임만 디코딩되어 끊김). `PreviewController`는 30Hz 타이머 시킹으로 구현.
 - 코드 서명·notarization 비활성, App Sandbox OFF (Process 실행 + NSWorkspace 휴지통/Finder 조작 위함).

@@ -9,7 +9,7 @@
 ## Key Files
 | File | Description |
 |------|-------------|
-| `bootstrap.sh` | xcodegen·gifski 의존성 체크 → gifski 바이너리를 `VideoToGif/Resources/bin/`로 복사 → `xcodegen generate` 실행 |
+| `bootstrap.sh` | xcodegen·gifski 의존성 체크 → gifski 바이너리를 `Clip2GIF/Resources/bin/`로 복사 → `xcodegen generate` 실행 |
 
 ## For AI Agents
 

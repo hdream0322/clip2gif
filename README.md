@@ -1,4 +1,4 @@
-# VideoToGif
+# Clip2GIF
 
 macOS용 동영상 → GIF 변환 앱입니다. 비디오 파일을 드래그하거나 불러온 뒤, 품질·속도·해상도를 설정하고 GIF로 내보낼 수 있습니다.
 
@@ -18,7 +18,7 @@ brew install xcodegen gifski
 ./scripts/bootstrap.sh
 
 # Xcode로 열기
-open VideoToGif.xcodeproj
+open Clip2GIF.xcodeproj
 ```
 
 ## 지원 포맷

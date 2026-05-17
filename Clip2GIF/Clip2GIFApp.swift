@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct VideoToGifApp: App {
+struct Clip2GIFApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     var body: some Scene {
         WindowGroup {

@@ -65,7 +65,7 @@
 			<key>NSMessage</key>
 			<string>convertToGIF</string>
 			<key>NSPortName</key>
-			<string>VideoToGif</string>
+			<string>Clip2GIF</string>
 			<key>NSSendFileTypes</key>
 			<array>
 				<string>public.movie</string>

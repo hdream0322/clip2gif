@@ -1,6 +1,6 @@
 <!-- Generated: 2026-04-27 | Updated: 2026-05-17 -->
 
-# VideoToGif
+# Clip2GIF
 
 ## Purpose
 macOS 네이티브 Video → GIF 변환 앱. SwiftUI 기반, AVFoundation으로 프레임 추출, 번들된 gifski 바이너리로 인코딩. 개인용(코드 서명/notarization 없음). Finder "Open With" + 우클릭 서비스("GIF으로 변환하기") 진입점 지원, 빌드 시 `/Applications`에 자동 설치.
@@ -12,12 +12,12 @@ macOS 네이티브 Video → GIF 변환 앱. SwiftUI 기반, AVFoundation으로 
 | `scripts/bootstrap.sh` | 개발 환경 부트스트랩 (xcodegen/gifski 의존성 체크 + 바이너리 복사 + xcodegen generate) |
 | `.gitignore` | Xcode/Swift 표준 + Resources/bin/gifski 바이너리 무시 |
 | `README.md` | 한국어 사용 안내 |
-| `VideoToGif.xcodeproj/` | XcodeGen이 생성. 직접 편집 금지 — `xcodegen generate`로 재생성 |
+| `Clip2GIF.xcodeproj/` | XcodeGen이 생성. 직접 편집 금지 — `xcodegen generate`로 재생성 |
 
 ## Subdirectories
 | Directory | Purpose |
 |-----------|---------|
-| `VideoToGif/` | 앱 소스 코드 (see `VideoToGif/AGENTS.md`) |
+| `Clip2GIF/` | 앱 소스 코드 (see `Clip2GIF/AGENTS.md`) |
 | `scripts/` | 빌드/셋업 스크립트 (see `scripts/AGENTS.md`) |
 | `.omc/`, `.claude/` | 도구 생성 메타데이터 (추적 안 함) |
 
@@ -25,7 +25,7 @@ macOS 네이티브 Video → GIF 변환 앱. SwiftUI 기반, AVFoundation으로 
 
 ### Working In This Directory
 - 새 .swift 파일 추가 시 `xcodegen generate` 재실행 필수 (.xcodeproj는 자동 생성물)
-- gifski 바이너리는 `VideoToGif/Resources/bin/gifski`에 위치, postBuildScript가 번들 Resources로 복사
+- gifski 바이너리는 `Clip2GIF/Resources/bin/gifski`에 위치, postBuildScript가 번들 Resources로 복사
 - `Bundle.main.url(forResource: "gifski", withExtension: nil)`로 런타임 접근 — subdirectory 사용 금지
 - macOS 13+ 타겟. `onChange(of:initial:_:)` 같은 macOS 14 API 사용 금지 (단일 파라미터 onChange만)
 - 코드 서명·notarization 비활성. App Sandbox OFF (Process로 외부 바이너리 실행, NSWorkspace로 휴지통/Finder 조작)

@@ -1,7 +1,7 @@
 <!-- Parent: ../AGENTS.md -->
 <!-- Generated: 2026-04-27 | Updated: 2026-05-17 -->
 
-# VideoToGif (앱 소스)
+# Clip2GIF (앱 소스)
 
 ## Purpose
 앱의 모든 Swift 소스. SwiftUI 진입점 + AppDelegate(Service/"Open With" 핸들러) + ContentView 컨테이너 + Models/Services/Views 3계층 구조.
@@ -9,7 +9,7 @@
 ## Key Files
 | File | Description |
 |------|-------------|
-| `VideoToGifApp.swift` | @main 진입점. `@NSApplicationDelegateAdaptor`로 AppDelegate 연결. WindowGroup, 최소(720×480)/기본(1100×720) 윈도우 크기 |
+| `Clip2GIFApp.swift` | @main 진입점. `@NSApplicationDelegateAdaptor`로 AppDelegate 연결. WindowGroup, 최소(720×480)/기본(1100×720) 윈도우 크기 |
 | `AppDelegate.swift` | NSApplicationDelegate. `servicesProvider` 등록 + `convertToGIF` 서비스 핸들러 + `application(_:open:)` "Open With". `PendingOpenStore`(싱글톤·NSLock)가 뷰 onAppear 이전 도착 URL을 큐잉, `.vtgOpenVideoFile` 노티로 전달 |
 | `ContentView.swift` | 메인 컨테이너. 2/3+1/3 좌우 분할, 변환 파이프라인(FrameExtractor → GifskiEncoder), 프리플라이트 용량 추정, DockProgress 갱신, 출력 폴더 선택, 원본 휴지통/복사/Finder, 크롭 비율 고정, 드롭/서비스/Open-With 처리 |
 | `Info.plist` | project.yml의 info.properties로 생성·관리 (직접 편집 금지) |

@@ -20,10 +20,10 @@ fi
 
 echo "==> Copying gifski binary..."
 GIFSKI_SRC="$(brew --prefix)/bin/gifski"
-GIFSKI_DST="$PROJECT_DIR/VideoToGif/Resources/bin/gifski"
+GIFSKI_DST="$PROJECT_DIR/Clip2GIF/Resources/bin/gifski"
 cp "$GIFSKI_SRC" "$GIFSKI_DST"
 chmod +x "$GIFSKI_DST"
-echo "    Copied gifski to VideoToGif/Resources/bin/gifski"
+echo "    Copied gifski to Clip2GIF/Resources/bin/gifski"
 
 echo "==> Running xcodegen..."
 cd "$PROJECT_DIR"
@@ -31,4 +31,4 @@ xcodegen generate
 
 echo ""
 echo "Done! Open the project with:"
-echo "  open VideoToGif.xcodeproj"
+echo "  open Clip2GIF.xcodeproj"

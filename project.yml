@@ -1,4 +1,4 @@
-name: VideoToGif
+name: Clip2GIF
 
 options:
   bundleIdPrefix: com.heodream
@@ -6,11 +6,11 @@ options:
     macOS: "13.0"
 
 targets:
-  VideoToGif:
+  Clip2GIF:
     type: application
     platform: macOS
     sources:
-      - path: VideoToGif
+      - path: Clip2GIF
         excludes:
           - "Resources/**"
           - "**/AGENTS.md"
@@ -21,7 +21,7 @@ targets:
           DEST="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
           mkdir -p "$DEST"
           chmod u+w "$DEST/gifski" 2>/dev/null || true
-          cp -f "$SRCROOT/VideoToGif/Resources/bin/gifski" "$DEST/gifski"
+          cp -f "$SRCROOT/Clip2GIF/Resources/bin/gifski" "$DEST/gifski"
           chmod +x "$DEST/gifski"
           echo "Copied gifski to $DEST/gifski"
       - name: "Install to /Applications"
@@ -37,7 +37,7 @@ targets:
           fi
     settings:
       base:
-        PRODUCT_NAME: VideoToGif
+        PRODUCT_NAME: Clip2GIF
         MACOSX_DEPLOYMENT_TARGET: "13.0"
         ENABLE_HARDENED_RUNTIME: NO
         SWIFT_VERSION: "5.9"
@@ -45,7 +45,7 @@ targets:
         CODE_SIGNING_REQUIRED: NO
         CODE_SIGNING_ALLOWED: NO
     info:
-      path: VideoToGif/Info.plist
+      path: Clip2GIF/Info.plist
       properties:
         NSHighResolutionCapable: true
         CFBundleDevelopmentRegion: en
@@ -75,7 +75,7 @@ targets:
           - NSMenuItem:
               default: GIF으로 변환하기
             NSMessage: convertToGIF
-            NSPortName: VideoToGif
+            NSPortName: Clip2GIF
             NSSendTypes:
               - public.file-url
               - NSFilenamesPboardType
