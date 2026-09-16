@@ -296,6 +296,10 @@ struct ResultPreviewSheet: View {
                             RoundedRectangle(cornerRadius: 10)
                                 .strokeBorder(Color.secondary.opacity(0.2))
                         )
+                        // 결과 GIF 를 Finder/타 앱(Slack·메신저 등)으로 바로
+                        // 드래그해 내보낸다. contentsOf 로 실제 파일을 등록해
+                        // 받는 쪽이 정지 이미지가 아닌 GIF 파일을 받게 한다.
+                        .onDrag { NSItemProvider(contentsOf: url) ?? NSItemProvider() }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .frame(maxWidth: 760, maxHeight: 560)
@@ -321,6 +325,11 @@ struct ResultPreviewSheet: View {
                 if let fileSizeText {
                     Text(fileSizeText)
                         .font(.caption.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                }
+                if exists {
+                    Label("미리보기를 드래그해 Finder·다른 앱으로 내보낼 수 있어요", systemImage: "hand.draw")
+                        .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
             }

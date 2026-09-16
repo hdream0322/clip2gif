@@ -7,9 +7,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Setup & Build
 
 ```bash
-brew install xcodegen gifski        # 최초 1회
-./scripts/bootstrap.sh              # gifski 바이너리 복사 + .xcodeproj 생성
+brew install xcodegen gifski dylibbundler  # 최초 1회
+./scripts/bootstrap.sh                     # gifski 바이너리+의존 dylib 벤더링 + .xcodeproj 생성
 ```
+
+- `bootstrap.sh`는 Homebrew `gifski`를 그대로 복사하지 않고 `dylibbundler`로 ffmpeg 계열 의존 dylib 전체를 `Clip2GIF/Resources/bin/lib/`에 벤더링하고 `@executable_path/lib/...`로 링크를 재작성한다 — Homebrew ffmpeg가 나중에 업그레이드돼도(예: macOS 업그레이드에 따른 brew 업그레이드) 앱이 깨지지 않도록 하기 위함. 동시에 `GifskiEncoder.swift`의 `expectedSHA256`도 자동 갱신된다.
 
 - **새 `.swift` 파일을 추가/삭제하면 반드시 `xcodegen generate` 재실행** — `.xcodeproj`는 `project.yml`에서 생성되는 산출물이며 직접 편집 금지.
 - `Clip2GIF/Info.plist`도 `project.yml`의 `info.properties`에서 생성됨 — 직접 편집 금지. NSServices/문서타입/다국어는 `project.yml`에서 수정.

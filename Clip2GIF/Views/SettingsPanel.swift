@@ -6,7 +6,10 @@ struct SettingsPanel: View {
     var naturalSize: CGSize? = nil
     /// 원본 영상 프레임율. FPS 슬라이더 상한.
     var videoFrameRate: Double = 30
+    @ObservedObject var presetStore: PresetStore
     @State private var qualityPreset: QualityPreset = .high
+    @State private var showSaveDialog = false
+    @State private var newPresetName = ""
 
     /// FPS 슬라이더 상한(원본 프레임율, 최소 6 보장).
     private var maxFps: Int { max(6, Int(videoFrameRate.rounded())) }
@@ -43,6 +46,55 @@ struct SettingsPanel: View {
 
     var body: some View {
         Form {
+            Section("프리셋") {
+                HStack {
+                    Menu {
+                        ForEach(ConversionPreset.builtIns) { p in
+                            Button(p.name) { apply(p) }
+                        }
+                        if !presetStore.userPresets.isEmpty {
+                            Divider()
+                            ForEach(presetStore.userPresets) { p in
+                                Button(p.name) { apply(p) }
+                            }
+                        }
+                    } label: {
+                        Label("불러오기", systemImage: "slider.horizontal.3")
+                    }
+
+                    Spacer()
+
+                    Button {
+                        newPresetName = ""
+                        showSaveDialog = true
+                    } label: {
+                        Label("현재 설정 저장", systemImage: "square.and.arrow.down")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+
+                    if !presetStore.userPresets.isEmpty {
+                        Menu {
+                            ForEach(presetStore.userPresets) { p in
+                                Button(role: .destructive) {
+                                    presetStore.delete(p)
+                                } label: {
+                                    Label(p.name, systemImage: "trash")
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
+                        .help("내 프리셋 삭제")
+                    }
+                }
+                Text("출력 취향(프레임율·화질·속도·배율·반복·왕복·고급압축)만 저장됩니다. 구간·크롭은 영상마다 달라 제외됩니다.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("재생 설정") {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
@@ -158,6 +210,31 @@ struct SettingsPanel: View {
         .onAppear {
             qualityPreset = matchedPreset(for: settings.quality)
         }
+        .onChange(of: settings.quality) { newValue in
+            // 프리셋 적용·외부 변경으로 화질이 바뀌면 상단 프리셋 Picker 동기화.
+            qualityPreset = matchedPreset(for: newValue)
+        }
+        .alert("프리셋 저장", isPresented: $showSaveDialog) {
+            TextField("프리셋 이름", text: $newPresetName)
+            Button("저장") {
+                let name = newPresetName.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !name.isEmpty else { return }
+                presetStore.save(ConversionPreset(name: name, from: settings))
+            }
+            Button("취소", role: .cancel) { }
+        } message: {
+            Text("같은 이름이 있으면 덮어씁니다.")
+        }
+    }
+
+    /// 프리셋의 출력 취향을 현재 설정에 덮어쓴다 (구간·크롭은 보존).
+    private func apply(_ preset: ConversionPreset) {
+        var s = settings
+        preset.apply(to: &s)
+        // fps 는 영상 프레임율 상한으로 클램프.
+        s.fps = min(maxFps, max(5, s.fps))
+        settings = s
+        qualityPreset = matchedPreset(for: s.quality)
     }
 
     /// gifski 고급 옵션 1줄: 켜면 1~100 슬라이더, 끄면 nil(미지정=gifski 기본).

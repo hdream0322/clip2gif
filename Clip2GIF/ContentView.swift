@@ -13,6 +13,8 @@ struct ContentView: View {
     @State private var settings: ConversionSettings = .default
     @StateObject private var job = ConversionJob()
     @StateObject private var preview = PreviewController()
+    @StateObject private var presetStore = PresetStore()
+    @StateObject private var batchQueue = BatchQueue()
     /// 사용자가 직접 고른 출력 폴더(있으면 우선). 없으면 매번 원본 영상 폴더에 저장.
     @State private var customOutputDir: URL?
     @State private var alertError: ConversionError?
@@ -27,6 +29,18 @@ struct ContentView: View {
     @State private var conversionTask: Task<Void, Never>?
     /// 변환 완료 결과 미리보기(별도 모달 창). nil 이면 닫힘.
     @State private var resultPreview: ResultItem?
+    /// 목표 용량 맞춤 다이얼로그/진행/결과 안내.
+    @State private var showTargetDialog = false
+    @State private var targetMBText = ""
+    @State private var targetFitting = false
+    @State private var targetMessage: String?
+    @State private var showBatchSheet = false
+    /// 진행 중인 목표 용량 탐색 Task (취소용).
+    @State private var targetTask: Task<Void, Never>?
+    /// 탐색 라이브 진행 표시 (탐색회수/배율/화질/측정치).
+    @State private var targetProbe: TargetSizeFitter.Probe?
+    /// 다음 변환에 1회 적용할 실측 보정 목표(바이트). 변환이 소비.
+    @State private var targetForNextConvert: Int64?
 
     // 자주 쓰는 출력 설정을 영속화 — 영상마다 .default 로 초기화되던 마찰 제거.
     // (trim/crop/fps 는 영상 의존이라 영속 대상에서 제외)
@@ -89,6 +103,28 @@ struct ContentView: View {
         }
         .sheet(item: $resultPreview) { item in
             ResultPreviewSheet(url: item.url) { resultPreview = nil }
+        }
+        .sheet(isPresented: $showBatchSheet) {
+            BatchQueueView(
+                queue: batchQueue,
+                onCancel: { conversionTask?.cancel() },
+                onClose: { showBatchSheet = false }
+            )
+        }
+        .alert("목표 용량에 맞추기", isPresented: $showTargetDialog) {
+            TextField("목표 용량 (MB)", text: $targetMBText)
+            Button("맞추기") { startTargetFit() }
+            Button("취소", role: .cancel) { }
+        } message: {
+            Text("원하는 최대 용량(MB)을 입력하세요. 배율을 먼저 낮추고, 부족하면 화질까지 자동으로 조정합니다.")
+        }
+        .alert("목표 용량 맞춤", isPresented: Binding(
+            get: { targetMessage != nil },
+            set: { if !$0 { targetMessage = nil } }
+        )) {
+            Button("확인") { targetMessage = nil }
+        } message: {
+            Text(targetMessage ?? "")
         }
         .onChange(of: settings) { _ in
             // 사용자 선호 영속화 (다음 영상 로드 시 복원). 영상이 있을 때만 —
@@ -275,7 +311,8 @@ struct ContentView: View {
             SettingsPanel(
                 settings: $settings,
                 naturalSize: source?.naturalSize,
-                videoFrameRate: source?.frameRate ?? 30
+                videoFrameRate: source?.frameRate ?? 30,
+                presetStore: presetStore
             )
                 .frame(maxHeight: .infinity, alignment: .top)
                 .disabled(job.isRunning)
@@ -487,6 +524,40 @@ struct ContentView: View {
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
+            if targetFitting {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        ProgressView().controlSize(.small)
+                        if let p = targetProbe {
+                            Text("탐색 \(p.index)회 · 배율 \(p.scalePercent)% · 화질 \(p.quality) → \(OutputEstimator.formattedRoundedMB(bytes: Double(p.measuredBytes)))")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("실측 표본 준비 중…")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Button(role: .cancel) {
+                        targetTask?.cancel()
+                    } label: {
+                        Label("탐색 취소", systemImage: "xmark.circle")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            } else {
+                Button {
+                    targetMBText = ""
+                    showTargetDialog = true
+                } label: {
+                    Label("목표 용량에 맞추기", systemImage: "scalemass")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(job.isRunning)
+                .help("원하는 파일 용량을 입력하면 실측 반복으로 배율·화질을 맞추고, 변환 시 실제 용량으로 보정합니다")
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -518,6 +589,71 @@ struct ContentView: View {
                 }
             }
         }
+    }
+
+    // MARK: - 목표 용량 맞춤
+
+    /// 입력한 목표 MB 로 배율·화질을 실측 반복 탐색해 조정한다(1단계).
+    /// 적용 후 targetForNextConvert 를 세팅 → 변환 시 실측 재인코딩으로
+    /// ±10% 잔차까지 보정(2단계).
+    private func startTargetFit() {
+        let normalized = targetMBText
+            .replacingOccurrences(of: ",", with: ".")
+            .trimmingCharacters(in: .whitespaces)
+        guard let mb = Double(normalized), mb > 0, let source = source else {
+            targetMessage = "올바른 숫자를 입력하세요 (예: 5 또는 9.5)."
+            return
+        }
+        let targetBytes = Int64(mb * 1024 * 1024)
+        let snapshot = settings
+        targetFitting = true
+        targetProbe = nil
+
+        targetTask = Task {
+            do {
+                let result = try await TargetSizeFitter.search(
+                    source: source,
+                    baseSettings: snapshot,
+                    targetBytes: targetBytes,
+                    onProbe: { probe in
+                        Task { @MainActor in targetProbe = probe }
+                    }
+                )
+                await MainActor.run {
+                    targetFitting = false
+                    targetProbe = nil
+                    settings.scalePercent = result.scalePercent
+                    settings.quality = result.quality
+                    // 변환 시 실측 재인코딩으로 잔차 보정 (2단계).
+                    targetForNextConvert = targetBytes
+                    let pred = OutputEstimator.formattedRoundedMB(
+                        bytes: Double(result.predictedBytes)
+                    )
+                    var msg = "탐색 \(result.probes)회 → 배율 \(result.scalePercent)% · 화질 \(result.quality) 로 조정했습니다.\n예상 \(pred) (목표 \(formatMB(mb))).\n"
+                    if result.feasible {
+                        msg += "변환 시 실제 용량을 확인해 목표를 넘으면 자동으로 한 번 더 줄입니다."
+                    } else {
+                        msg += "\n※ 최소 설정(배율 25%·화질 1)으로도 목표를 못 맞춥니다. 구간(Trim)을 줄이거나 프레임율을 낮춰보세요."
+                    }
+                    targetMessage = msg
+                }
+            } catch is CancellationError {
+                await MainActor.run {
+                    targetFitting = false
+                    targetProbe = nil
+                }
+            } catch {
+                await MainActor.run {
+                    targetFitting = false
+                    targetProbe = nil
+                    targetMessage = "용량을 측정하지 못해 맞출 수 없습니다."
+                }
+            }
+        }
+    }
+
+    private func formatMB(_ mb: Double) -> String {
+        mb == mb.rounded() ? "\(Int(mb)) MB" : String(format: "%.1f MB", mb)
     }
 
     // MARK: - 액션
@@ -592,6 +728,8 @@ struct ContentView: View {
             job.stepName = "배치 변환 0/\(urls.count)"
             job.state = .extracting(progress: 0)
             DockProgress.set(0.001)
+            batchQueue.load(urls)
+            showBatchSheet = true
         }
 
         var lastOutputDir: URL?
@@ -602,6 +740,7 @@ struct ContentView: View {
                 job.stepName = "배치 변환 \(idx + 1)/\(urls.count)"
                 job.detail = url.lastPathComponent
                 job.state = .extracting(progress: 0)
+                batchQueue.mark(url, .processing)
             }
 
             let tempDir = FileManager.default.temporaryDirectory
@@ -648,7 +787,10 @@ struct ContentView: View {
                     Task { @MainActor in job.state = .encoding(progress: p) }
                 }
                 lastOutputDir = baseDir
-                await MainActor.run { job.batchDone += 1 }
+                await MainActor.run {
+                    job.batchDone += 1
+                    batchQueue.mark(url, .done, output: outputURL)
+                }
             } catch let e as ConversionError where e == .cancelled {
                 try? FileManager.default.removeItem(at: tempDir)
                 break
@@ -660,15 +802,21 @@ struct ContentView: View {
                 let detail = (error as? ConversionError)?.debugDetail
                     ?? error.localizedDescription
                 NSLog("[Clip2GIF] batch skip %@: %@", url.lastPathComponent, detail)
-                await MainActor.run { job.batchFailures += 1 }
+                await MainActor.run {
+                    job.batchFailures += 1
+                    batchQueue.mark(url, .failed(detail))
+                }
             }
         }
 
         await MainActor.run {
             DockProgress.set(nil)
             if Task.isCancelled {
+                batchQueue.markRemainingSkipped()
+                batchQueue.finish()
                 job.reset()
             } else {
+                batchQueue.finish()
                 let doneCount = job.batchDone
                 let failCount = job.batchFailures
                 job.stepName = "배치 완료"
@@ -721,6 +869,8 @@ struct ContentView: View {
                 // 기본 FPS는 항상 원본 영상 프레임율과 동일하게.
                 s.fps = max(6, Int(loaded.frameRate.rounded()))
                 settings = s
+                // 새 영상 → 이전 영상에 묶인 목표 보정 무효화.
+                targetForNextConvert = nil
                 preview.load(url: loaded.url)
             } catch let e as ConversionError {
                 report(e)
@@ -732,6 +882,13 @@ struct ContentView: View {
 
     private func convert() async {
         guard let source else { return }
+
+        // 목표 용량 실측 보정 대상 — 이 변환 1회만 소비.
+        let convertTarget: Int64? = await MainActor.run {
+            let t = targetForNextConvert
+            targetForNextConvert = nil
+            return t
+        }
 
         let trimDuration = settings.effectiveTrimEnd(duration: source.duration) - settings.trimStart
         let outputDuration = trimDuration / max(0.1, settings.speed)
@@ -807,22 +964,61 @@ struct ContentView: View {
                 DockProgress.set(job.overallProgress)
             }
 
-            try await GifskiEncoder.encode(
-                frames: frames,
-                settings: settings,
-                naturalSize: source.naturalSize,
-                output: outputURL
-            ) { p in
-                Task { @MainActor in
-                    let current = Int(Double(totalFrames) * p)
-                    job.currentFrame = current
-                    job.detail = "\(current) / \(totalFrames) 프레임"
-                    job.state = .encoding(progress: p)
-                    DockProgress.set(job.overallProgress)
+            func currentOutputSize() -> Int64 {
+                guard let a = try? FileManager.default.attributesOfItem(atPath: outputURL.path),
+                      let n = a[.size] as? NSNumber else { return 0 }
+                return n.int64Value
+            }
+
+            // 추출한 프레임을 재사용하고 gifski 인코딩만 반복한다(재추출 없음).
+            // 실제 파일이 목표를 넘으면 화질을 할선법으로 단조 감소시켜
+            // 최대 maxCorrections 회 재인코딩 — 사용자가 원한 "실측 bisect".
+            var encodeSettings = settings
+            var correction = 0
+            let maxCorrections = convertTarget == nil ? 0 : 3
+            while true {
+                if correction > 0 {
+                    try? FileManager.default.removeItem(at: outputURL)
+                    await MainActor.run {
+                        job.stepName = "목표 보정 재인코딩 \(correction)/\(maxCorrections)"
+                        job.currentFrame = 0
+                        job.detail = "화질 \(encodeSettings.quality) 로 다시 인코딩"
+                        job.state = .encoding(progress: 0)
+                        DockProgress.set(job.overallProgress)
+                    }
                 }
+
+                try await GifskiEncoder.encode(
+                    frames: frames,
+                    settings: encodeSettings,
+                    naturalSize: source.naturalSize,
+                    output: outputURL
+                ) { p in
+                    Task { @MainActor in
+                        let current = Int(Double(totalFrames) * p)
+                        job.currentFrame = current
+                        job.detail = "\(current) / \(totalFrames) 프레임"
+                        job.state = .encoding(progress: p)
+                        DockProgress.set(job.overallProgress)
+                    }
+                }
+
+                guard let target = convertTarget, correction < maxCorrections else { break }
+                let size = currentOutputSize()
+                if size <= target { break }
+                let ratio = Double(target) / Double(max(1, size))
+                let proposed = Int((Double(encodeSettings.quality) * pow(ratio, 0.65)).rounded())
+                let nextQ = max(1, min(encodeSettings.quality - 1, proposed))
+                if nextQ >= encodeSettings.quality { break }  // 더 못 줄임(이미 화질 1)
+                encodeSettings.quality = nextQ
+                correction += 1
             }
 
             await MainActor.run {
+                // 보정으로 실제 사용한 화질을 UI/프리뷰에 반영.
+                if encodeSettings.quality != settings.quality {
+                    settings.quality = encodeSettings.quality
+                }
                 job.stepName = "완료"
                 job.detail = ""
                 job.state = .done(outputURL)

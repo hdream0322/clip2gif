@@ -2,7 +2,7 @@ import Foundation
 import CoreGraphics
 
 /// 크롭 박스 가로:세로 비율 고정 옵션. ratio 는 "출력 픽셀" 기준 가로/세로.
-enum AspectLock: String, CaseIterable, Identifiable, Equatable {
+enum AspectLock: String, CaseIterable, Identifiable, Equatable, Codable {
     case free
     case square
     case r4_3
@@ -36,7 +36,7 @@ enum AspectLock: String, CaseIterable, Identifiable, Equatable {
     }
 }
 
-struct ConversionSettings: Equatable {
+struct ConversionSettings: Equatable, Codable {
     var trimStart: TimeInterval = 0
     var trimEnd: TimeInterval = 0
     var fps: Int = 15

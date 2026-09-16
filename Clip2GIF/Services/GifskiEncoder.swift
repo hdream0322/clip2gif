@@ -6,7 +6,7 @@ struct GifskiEncoder {
     /// 바이너리 교체 시 `shasum -a 256 Clip2GIF/Resources/bin/gifski` 로
     /// 재계산해 이 상수를 갱신해야 한다.
     private static let expectedSHA256 =
-        "42bde7c5b55ab6ee3d41c7daab1cd3c499d848eecf077409b840f56fcd64a156"
+        "e66b5249bd45ba5a1a4a580e3363693392b8735b384ab16fa660146b47536b8f"
 
     /// CLI 인자 총 길이 상한(보수치). macOS ARG_MAX(약 1MB) 한참 아래로 잡아
     /// posix_spawn 의 E2BIG / 인자 잘림을 사전에 차단한다.

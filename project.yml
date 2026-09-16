@@ -31,6 +31,18 @@ targets:
           cp -f "$SRCROOT/Clip2GIF/Resources/bin/gifski" "$DEST/gifski"
           chmod +x "$DEST/gifski"
           echo "Copied gifski to $DEST/gifski"
+
+          # gifski's Homebrew ffmpeg dependencies are vendored (by bootstrap.sh
+          # via dylibbundler) into Resources/bin/lib and referenced via
+          # @executable_path/lib/... so gifski keeps working even if the
+          # user's Homebrew ffmpeg is later upgraded/removed.
+          LIB_SRC="$SRCROOT/Clip2GIF/Resources/bin/lib"
+          if [ -d "$LIB_SRC" ]; then
+            rm -rf "$DEST/lib"
+            mkdir -p "$DEST/lib"
+            cp -f "$LIB_SRC"/*.dylib "$DEST/lib/"
+            echo "Copied $(ls "$LIB_SRC" | wc -l | tr -d ' ') dylib(s) to $DEST/lib"
+          fi
       - name: "Install to /Applications"
         script: |
           set -e
